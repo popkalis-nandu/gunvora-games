@@ -1,5 +1,5 @@
 /* =====================================================================
-   GUNVORA GAMES — GAME CATALOGUE
+   Gaming World of Jarvis — GAME CATALOGUE
    Add a game: copy one object below, give it a unique id, and (for a
    playable game) add games/<script>.js. See README "Adding a game".
    ===================================================================== */
@@ -16,7 +16,7 @@ window.GV_CATEGORIES = [
 window.GV_GAMES = [
   /* ---------------- FEATURED / COMING SOON (from the launch plan) ---------------- */
   {
-    id: "shadow-front", title: "GUNVORA: Shadow Front", tagline: "Sniper and soldier shooting game.",
+    id: "shadow-front", title: "Shadow Front", tagline: "Sniper and soldier shooting game.",
     status: "coming-soon", premium: false, kids: false, featured: true, trending: 0, added: "2026-10-20",
     categories: ["shooting", "sniper"], difficulty: "Hard", age: "16+",
     platforms: ["Android (coming soon)", "Web (coming soon)"],
@@ -114,7 +114,7 @@ window.GV_GAMES = [
     status: "playable", premium: false, kids: false, trending: 5, added: "2026-10-10",
     script: "snake.js", categories: ["puzzles"], difficulty: "Medium", age: "3+",
     platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
-    storyline: "A rogue program loose in the GUNVORA grid. Eat data cores, grow longer, and don't bite your own tail.",
+    storyline: "A rogue program loose in the Jarvis grid. Eat data cores, grow longer, and don't bite your own tail.",
     controls: [["Arrows / WASD", "Turn"], ["Swipe / D-pad", "Turn (mobile)"], ["P", "Pause"]],
     instructions: ["Eat cores to grow (+10).", "Pink bonus cores appear for a short time (+50).", "Hitting a wall or yourself ends the game."],
     store: ["skin-snake-rainbow"]

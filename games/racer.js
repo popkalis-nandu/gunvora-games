@@ -1,4 +1,4 @@
-/* Turbo Racing: Rush — original GUNVORA game. */
+/* Turbo Racing: Rush — original Gaming World of Jarvis game. */
 (function () {
   var W = 400, H = 640, L = 50, R = 350, LANES = 4, LW = (R - L) / LANES, S;
   var COLS = ["#ff8a3d", "#39ff88", "#b388ff", "#ffd23f", "#ff4d5e", "#7fe8ff"];

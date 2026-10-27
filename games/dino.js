@@ -1,4 +1,4 @@
-/* Dino Dash — original GUNVORA kids game (no ads, no purchases). */
+/* Dino Dash — original Gaming World of Jarvis kids game (no ads, no purchases). */
 (function () {
   var W = 800, H = 400, GY = 320, S;
   function init() { S = { y: GY, vy: 0, duck: false, t: 0, speed: 280, obs: [], stars: [], spawn: 1.2, hearts: 3, inv: 0, dist: 0, bonus: 0, clouds: [], hills: 0, leg: 0, pops: [] }; for (var i = 0; i < 5; i++) S.clouds.push({ x: i * 180 + Math.random() * 60, y: 40 + Math.random() * 80, s: .6 + Math.random() * .6 }); }

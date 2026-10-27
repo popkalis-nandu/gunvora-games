@@ -1,4 +1,4 @@
-/* Memory Jungle — original GUNVORA kids game (no ads, no purchases). */
+/* Memory Jungle — original Gaming World of Jarvis kids game (no ads, no purchases). */
 (function () {
   var W = 600, H = 640, N = 4, CW = 120, CH = 120, GAP = 12, OX = (W - (N * CW + (N - 1) * GAP)) / 2, OY = 100, S;
   var ANIMALS = [

@@ -1,4 +1,4 @@
-/* GUNVORA GAMES — shared site logic: layout, entitlements, payments, ads, cookies. */
+/* Gaming World of Jarvis — shared site logic: layout, entitlements, payments, ads, cookies. */
 (function () {
   "use strict";
   var C = window.GV_CONFIG || {};
@@ -80,10 +80,10 @@
   /* ---------- logo ---------- */
   GV.logo = function (size) {
     size = size || 34;
-    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00d4ff"/><stop offset="1" stop-color="#7b5cff"/></linearGradient></defs>' +
+    return '<svg class="brand-mark" width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00d4ff"/><stop offset="1" stop-color="#7b5cff"/></linearGradient></defs>' +
       '<path d="M32 3 L57 17.5 V46.5 L32 61 L7 46.5 V17.5Z" fill="#05070d" stroke="url(#lg-a)" stroke-width="3.5"/>' +
-      '<path d="M43 24 A13 13 0 1 0 45 36 H33" fill="none" stroke="url(#lg-a)" stroke-width="5" stroke-linecap="round"/>' +
-      '<circle cx="32" cy="32" r="2.6" fill="#ff2bd6"/><path d="M32 13v6M32 45v6M13 32h6" stroke="#00d4ff" stroke-width="2" stroke-linecap="round"/></svg>';
+      '<path d="M24 18 H44 M37 18 V37 A9 9 0 0 1 19 37" fill="none" stroke="url(#lg-a)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="46" cy="44" r="3" fill="#ff2bd6"/></svg>';
   };
 
   /* ---------- cards ---------- */
@@ -120,7 +120,7 @@
     var here = location.pathname.split("/").pop() || "index.html";
     h.className = "site-header";
     h.innerHTML = '<a class="skip" href="#main">Skip to content</a><div class="wrap nav-row">' +
-      '<a class="brand" href="index.html" aria-label="' + GV.esc(C.siteName) + ' home">' + GV.logo(36) + '<span class="brand-name">GUNVORA<b>GAMES</b></span></a>' +
+      '<a class="brand" href="index.html" aria-label="' + GV.esc(C.siteName) + ' home">' + GV.logo(36) + '<span class="brand-name"><span class="bn-top">Gaming World of</span><span class="bn-main">JARVIS</span></span></a>' +
       '<form class="search" role="search" action="games.html"><label class="sr-only" for="hdr-q">Search games</label><input id="hdr-q" name="q" type="search" placeholder="Search games…" autocomplete="off"><button aria-label="Search">⌕</button></form>' +
       '<button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="main-nav">☰</button>' +
       '<nav id="main-nav" class="main-nav" aria-label="Main">' + NAV.map(function (n) { return '<a href="' + n[0] + '"' + (n[0] === here ? ' aria-current="page"' : '') + '>' + n[1] + '</a>'; }).join("") +
@@ -138,7 +138,7 @@
       ["Company", [["about.html", "About us"], ["contact.html", "Contact us"], ["grievance.html", "Grievance officer"]]],
       ["Legal", [["privacy.html", "Privacy policy"], ["terms.html", "Terms & conditions"], ["refund.html", "Refund & cancellation"], ["shipping.html", "Shipping & delivery"], ["cookies.html", "Cookie policy"], ["disclaimer.html", "Disclaimer"]]]
     ];
-    f.innerHTML = '<div class="wrap"><div class="foot-grid"><div class="foot-brand"><a class="brand" href="index.html">' + GV.logo(40) + '<span class="brand-name">GUNVORA<b>GAMES</b></span></a><p>' + GV.esc(C.tagline) + '</p><p class="small muted">' + GV.esc(C.businessName) + '<br>' + GV.esc(C.address) + (C.gstin ? '<br>GSTIN: ' + GV.esc(C.gstin) : '') + '<br><a href="mailto:' + GV.esc(C.contactEmail) + '">' + GV.esc(C.contactEmail) + '</a></p></div>' +
+    f.innerHTML = '<div class="wrap"><div class="foot-grid"><div class="foot-brand"><a class="brand" href="index.html">' + GV.logo(40) + '<span class="brand-name"><span class="bn-top">Gaming World of</span><span class="bn-main">JARVIS</span></span></a><p>' + GV.esc(C.tagline) + '</p><p class="small muted">' + GV.esc(C.businessName) + '<br>' + GV.esc(C.address) + (C.gstin ? '<br>GSTIN: ' + GV.esc(C.gstin) : '') + '<br><a href="mailto:' + GV.esc(C.contactEmail) + '">' + GV.esc(C.contactEmail) + '</a></p></div>' +
       cols.map(function (c) { return '<div><h4>' + c[0] + '</h4><ul>' + c[1].map(function (l) { return '<li><a href="' + l[0] + '">' + l[1] + '</a></li>'; }).join("") + '</ul></div>'; }).join("") +
       '</div><div class="foot-bottom"><span>© ' + new Date().getFullYear() + ' ' + GV.esc(C.businessName) + '. All game titles, logos and artwork are original works of ' + GV.esc(C.siteName) + '.</span><button class="linkish" id="cookie-settings">Cookie settings</button></div></div>';
     GV.$("#cookie-settings").addEventListener("click", function () { store("gv_consent", null); cookieBanner(true); });

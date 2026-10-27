@@ -25,7 +25,7 @@
         if (r.ok) { GV.$("#code").value = ""; paint(); GV.refreshAds(); var cta = GV.$(".nav-cta"); if (cta && GV.isPremium()) cta.textContent = "★ Premium active"; }
       });
       GV.$("#reset-data").addEventListener("click", function () {
-        if (!confirm("Erase all GUNVORA data stored in this browser (premium status, items, high scores, cookie choice)?")) return;
+        if (!confirm("Erase all Gaming World of Jarvis data stored in this browser (premium status, items, high scores, cookie choice)?")) return;
         Object.keys(localStorage).filter(function (k) { return k.indexOf("gv_") === 0; }).forEach(function (k) { localStorage.removeItem(k); });
         location.reload();
       });

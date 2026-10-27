@@ -1,4 +1,4 @@
-/* Shadow Front: Sniper Range — original GUNVORA game. */
+/* Shadow Front: Sniper Range — original Gaming World of Jarvis game. */
 (function () {
   var W = 800, H = 450, ROWS = [{ y: 235, s: .55 }, { y: 300, s: .75 }, { y: 390, s: 1 }];
   var S;

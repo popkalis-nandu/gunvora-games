@@ -1,4 +1,4 @@
-/* GUNVORA GAMES — original procedural SVG cover art (no external images). */
+/* Gaming World of Jarvis — original procedural SVG cover art (no external images). */
 (function () {
   var n = 0;
   function rng(seed) { var s = seed >>> 0 || 1; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }

@@ -1,5 +1,5 @@
 /* =====================================================================
-   GUNVORA GAMES — SITE CONFIGURATION  (the ONLY file you normally edit)
+   Gaming World of Jarvis — SITE CONFIGURATION  (the ONLY file you normally edit)
    ---------------------------------------------------------------------
    1. Replace every value marked  >>> REPLACE <<<  with your real details.
    2. Paste your Razorpay / Stripe / Instamojo / Cashfree "Payment Link"
@@ -10,12 +10,12 @@
    ===================================================================== */
 window.GV_CONFIG = {
   /* ---------- Brand & site ---------- */
-  siteName: "GUNVORA GAMES",
-  tagline: "Play free. Play loud. Play GUNVORA.",
+  siteName: "Gaming World of Jarvis",
+  tagline: "Play free. Play loud. Play Jarvis.",
   siteUrl: "https://popkalis-nandu.github.io/gunvora-games",              // >>> REPLACE <<< your live domain, no trailing slash
 
   /* ---------- Business / legal identity (shown on legal pages) ---------- */
-  businessName: "[Your Business Name]",            // >>> REPLACE <<< e.g. "Gunvora Games" or your registered firm name
+  businessName: "[Your Business Name]",            // >>> REPLACE <<< e.g. "Gaming World of Jarvis" or your registered firm name
   legalEntity: "[Sole Proprietorship / LLP / Pvt Ltd]", // >>> REPLACE <<<
   ownerName: "[Owner / Proprietor Name]",          // >>> REPLACE <<<
   address: "[Street Address], [City], [State] – [PIN], India", // >>> REPLACE <<<

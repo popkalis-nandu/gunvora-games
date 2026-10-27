@@ -1,4 +1,4 @@
-# GUNVORA GAMES — replace example.com with your domain
+# Gaming World of Jarvis — replace example.com with your domain
 User-agent: *
 Allow: /
 Disallow: /redeem.html

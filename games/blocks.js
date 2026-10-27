@@ -1,4 +1,4 @@
-/* Neon Blocks — original GUNVORA premium falling-block puzzle. */
+/* Neon Blocks — original Gaming World of Jarvis premium falling-block puzzle. */
 (function () {
   var W = 460, H = 680, C = 28, BW = 10, BH = 20, OX = 14, OY = 40, S;
   var SHAPES = {

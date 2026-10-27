@@ -1,4 +1,4 @@
-/* Star Vanguard — original GUNVORA premium game. */
+/* Star Vanguard — original Gaming World of Jarvis premium game. */
 (function () {
   var W = 480, H = 680, S;
   function init() {

@@ -1,4 +1,4 @@
-# GUNVORA GAMES — static games website
+# Gaming World of Jarvis — static games website
 
 A complete, original games portal built with **plain HTML, CSS and JavaScript**.
 It has no build step, no framework and no server code, so it runs on any free static host
@@ -67,7 +67,7 @@ Any element with `data-cfg="contactEmail"` (or `data-cfg-mail`, `data-cfg-price`
 
 | Field | What to put |
 |---|---|
-| `siteUrl` | Your live domain, e.g. `https://gunvora.in` (no trailing slash) |
+| `siteUrl` | Your live domain, e.g. `https://www.yourdomain.in` (no trailing slash) |
 | `businessName`, `legalEntity`, `ownerName` | Your registered name and entity type |
 | `address`, `jurisdictionCity` | Full postal address; city for court jurisdiction |
 | `gstin` | GSTIN, or `""` if not registered |

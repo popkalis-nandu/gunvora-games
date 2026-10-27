@@ -1,4 +1,4 @@
-/* GUNVORA GAMES — play page: loads a game script into a shared canvas engine.
+/* Gaming World of Jarvis — play page: loads a game script into a shared canvas engine.
    A game calls GVPlay.register({ width, height, touch, init, update, draw }). */
 (function () {
   "use strict";
@@ -39,7 +39,7 @@
     $("#play-badges").innerHTML = GV.badges(g);
     $("#play-info").href = "game.html?id=" + g.id;
     if (g.premium && !GV.isPremium()) {
-      main.querySelector(".play-wrap").innerHTML = '<div class="lock"><div class="detail-cover">' + GVCover(g.id, 0, g.title) + '</div><span class="badge prem">★ Premium game</span><h1 style="margin-top:12px">' + GV.esc(g.title) + '</h1><p class="muted">' + GV.esc(g.tagline) + ' This game is included with GUNVORA Premium — ad-free play plus every premium game, from ' + GV.price(GV.cfg.plans.monthly.price) + '/month.</p><div class="actions" style="justify-content:center"><a class="btn gold" href="pricing.html">★ Get Premium</a><a class="btn ghost" href="redeem.html">I have an unlock code</a></div><p class="small muted" style="margin-top:18px"><a href="games.html?filter=free">Or play one of our free games →</a></p></div>';
+      main.querySelector(".play-wrap").innerHTML = '<div class="lock"><div class="detail-cover">' + GVCover(g.id, 0, g.title) + '</div><span class="badge prem">★ Premium game</span><h1 style="margin-top:12px">' + GV.esc(g.title) + '</h1><p class="muted">' + GV.esc(g.tagline) + ' This game is included with Jarvis Premium — ad-free play plus every premium game, from ' + GV.price(GV.cfg.plans.monthly.price) + '/month.</p><div class="actions" style="justify-content:center"><a class="btn gold" href="pricing.html">★ Get Premium</a><a class="btn ghost" href="redeem.html">I have an unlock code</a></div><p class="small muted" style="margin-top:18px"><a href="games.html?filter=free">Or play one of our free games →</a></p></div>';
       return;
     }
     var s = document.createElement("script"); s.src = "games/" + g.script; s.onerror = function () { $("#ov-title").textContent = "Couldn't load the game. Please refresh."; }; document.body.appendChild(s);

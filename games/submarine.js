@@ -1,4 +1,4 @@
-/* Deep Sea Strike: Patrol — original GUNVORA game. */
+/* Deep Sea Strike: Patrol — original Gaming World of Jarvis game. */
 (function () {
   var W = 800, H = 450, S;
   function init() {

@@ -7,7 +7,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     /* homepage rows */
-    var hero = $("#hero-art"); if (hero) hero.innerHTML = GVCover("shadow-front", 0, "GUNVORA: Shadow Front key art");
+    var hero = $("#hero-art"); if (hero) hero.innerHTML = GVCover("shadow-front", 0, "Shadow Front key art");
     var heroPlay = $("#hero-play"); if (heroPlay) heroPlay.innerHTML = GV.playBadge("shadow-front");
     fill($("#row-trending"), playable.slice().sort(function (a, b) { return a.trending - b.trending; }).slice(0, 8));
     fill($("#row-new"), G.slice().sort(function (a, b) { return b.added < a.added ? -1 : 1; }).slice(0, 8));

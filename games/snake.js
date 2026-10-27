@@ -1,4 +1,4 @@
-/* Neon Snake — original GUNVORA game. */
+/* Neon Snake — original Gaming World of Jarvis game. */
 (function () {
   var W = 480, H = 600, CS = 24, COLS = 20, ROWS = 20, OY = 40, S;
   function rndCell() { var c; do { c = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) }; } while (S && S.body.some(function (b) { return b.x === c.x && b.y === c.y; })); return c; }
