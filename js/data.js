@@ -253,6 +253,62 @@ window.GV_GAMES = [
     store: ["skin-snake-rainbow"]
   },
 
+  /* ---------------- NEW MINI GAMES — FREE (6) ---------------- */
+  {
+    id: "color-blast-3", title: "Color Blast 3", tagline: "Swap, match and blast your way through 50 levels.",
+    status: "playable", premium: false, kids: false, trending: 9, added: "2026-10-27", isNew: true, pack: "mini6",
+    script: "colorblast.js", categories: ["puzzles", "arcade"], difficulty: "Easy", age: "3+",
+    platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
+    storyline: "The Color Lab has overflowed with glowing energy balls. Line them up, set off rockets, bombs and rainbow orbs, crack the crystal tiles and smash the crates to restore order — one satisfying cascade at a time.",
+    controls: [["Swipe / Drag", "Swap two neighbouring balls"], ["Tap + Tap", "Select, then tap a neighbour to swap"], ["Arrows + Space", "Move cursor, pick up and swap"], ["P / Esc", "Pause"]],
+    instructions: ["Swap two neighbouring balls to line up 3 or more of the same colour.", "Match 4 for a Rocket, an L or T shape for a Bomb, 5 in a row for a Rainbow orb.", "Each level has a goal (score, colours, crystals or crates) and a move limit — finish with moves to spare for more stars.", "Boosters: Hammer smashes one ball, Shuffle mixes the board.", "60-second Challenge: unlimited moves, beat your high score before the timer runs out."]
+  },
+  {
+    id: "turbo-lane-rush", title: "Turbo Lane Rush", tagline: "Three lanes. Endless speed. Grab the coins!",
+    status: "playable", premium: false, kids: false, trending: 10, added: "2026-10-27", isNew: true, pack: "mini6",
+    script: "lanerush.js", categories: ["arcade", "racing", "adventure"], difficulty: "Medium", age: "3+",
+    platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
+    storyline: "Neon City's rooftop rail lines have become the hottest race track in town. Sprint down three lanes, leap barriers, slide under gates and dodge oncoming trams while you collect every coin to unlock eight runners.",
+    controls: [["Swipe ← →  /  Arrows / A D", "Change lane"], ["Swipe ↑  /  ↑ / W / Space", "Jump"], ["Swipe ↓  /  ↓ / S", "Slide"], ["P / Esc", "Pause"]],
+    instructions: ["Dodge trams and barriers — jump over low barriers, slide under high gates.", "Collect coins and power-ups: Magnet, 2× Score and Shield.", "Complete 30 missions (3 at a time) for bonus coins.", "Spend coins to unlock 8 runners, each with a small perk.", "Beat the Daily Challenge target for a coin bonus. The speed keeps rising!"]
+  },
+  {
+    id: "bubble-kingdom", title: "Bubble Kingdom", tagline: "Aim, pop and rescue the trapped stars.",
+    status: "playable", premium: false, kids: true, trending: 11, added: "2026-10-27", isNew: true, pack: "mini6",
+    script: "bubblekingdom.js", categories: ["puzzles", "kids", "arcade"], difficulty: "Easy", age: "3+",
+    platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
+    storyline: "A grumpy storm cloud has trapped the Kingdom's star-sprites inside bubbles high above the castle. Grab the royal bubble cannon, aim carefully and pop your way through 100 levels to set every star free.",
+    controls: [["Drag", "Aim the cannon"], ["Release", "Shoot"], ["← → / Space", "Aim and shoot with keys"], ["Tap the spare bubble / ↓", "Swap bubbles"]],
+    instructions: ["Shoot bubbles to make groups of 3 or more of the same colour.", "Bubbles that are no longer hanging from the top fall and score big.", "Free every trapped star (pop a bubble next to it, or drop it) to win.", "Special bubbles: Bomb, Rainbow and Stone. Boosters: Fireball, Rainbow and Long aim.", "Fewer shots used = more stars (up to 3). No ads, no purchases."]
+  },
+  {
+    id: "mini-soldier-strike", title: "Mini Soldier Strike", tagline: "Hold the base against drones, robots and bosses.",
+    status: "playable", premium: false, kids: false, trending: 12, added: "2026-10-27", isNew: true, pack: "mini6",
+    script: "soldierstrike.js", categories: ["shooting", "arcade"], difficulty: "Medium", age: "7+",
+    platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
+    storyline: "Outpost Kilo is the last base standing between a rogue robot factory and the valley. Private Ash mans the turret: blast drone swarms, stop walking mechs and take down five giant bosses, then spend your salvage on better guns and thicker armour.",
+    controls: [["Drag / Mouse", "Aim"], ["Tap / Hold / Click", "Fire"], ["← → / A D", "Aim with keys"], ["Space", "Fire"], ["P / Esc", "Pause"]],
+    instructions: ["Survive every wave of a mission to win it — 40 missions in all.", "A boss arrives every 8th mission (5 bosses).", "Earn salvage credits to buy 10 weapons and upgrade armour, repair and damage in the Armoury.", "If the base armour reaches zero, the mission fails — upgrade and try again."]
+  },
+  {
+    id: "parking-escape", title: "Parking Escape", tagline: "Slide the cars. Free the red one.",
+    status: "playable", premium: false, kids: true, trending: 13, added: "2026-10-27", isNew: true, pack: "mini6",
+    script: "parking.js", categories: ["puzzles", "kids", "arcade"], difficulty: "Medium", age: "3+",
+    platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
+    storyline: "Rush hour at the Jarvis Mall car park and everyone is boxed in! Slide cars and trucks back and forth to open a path so the little red car can drive out of the exit.",
+    controls: [["Drag a vehicle", "Slide it along its lane"], ["Arrows + Space", "Select a vehicle and move it"], ["Hint button", "Show the next best move"], ["Undo / Restart", "Take back moves"]],
+    instructions: ["Cars only slide forwards and backwards in their own lane.", "Clear a path so the red car can leave through the exit on the right.", "Each level has a move limit — solve it in the fewest moves for 3 stars.", "Every one of the 100 levels is checked to be solvable. Stuck? Use a hint (earn more by getting 3 stars)."]
+  },
+  {
+    id: "sky-tower-stack", title: "Sky Tower Stack", tagline: "One tap. One block. How high can you go?",
+    status: "playable", premium: false, kids: true, trending: 14, added: "2026-10-27", isNew: true, pack: "mini6",
+    script: "skytower.js", categories: ["arcade", "kids"], difficulty: "Easy", age: "3+",
+    platforms: ["Web (desktop & mobile)", "Android (coming soon)"],
+    storyline: "The city wants a tower that touches space. Every block slides in from the side — drop it at just the right moment. Anything hanging over the edge is sliced off, so the tower gets narrower unless your timing is perfect.",
+    controls: [["Tap / Click", "Drop the block"], ["Space / Enter", "Drop the block"], ["P / Esc", "Pause"]],
+    instructions: ["Drop each moving block on top of the tower.", "Overhanging parts are trimmed away — miss completely and the tower falls.", "Perfect drops build a combo: 3 in a row makes the block grow back.", "Play Endless for a high score, or beat 30 Challenges.", "Unlock 6 tower themes by building higher."]
+  },
+
   /* ---------------- PLAYABLE NOW — PREMIUM (2) ---------------- */
   {
     id: "star-vanguard", title: "Star Vanguard", tagline: "Wave after wave. One ship. No retreat.",

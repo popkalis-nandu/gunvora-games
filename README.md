@@ -242,3 +242,10 @@ Any of the three gives you free HTTPS. Point your domain's DNS at the host and u
 
 ## Embedded web games (added 2026-10-27)
 Standalone games live in `games/<slug>/`. In `js/data.js` set `embed: "games/<slug>/"`, `orientation: "landscape"|"portrait"` and `shots: N` (number of `assets/shots/<slug>-N.jpg` screenshots). `play.html?id=<slug>` then loads the game full-size in an iframe with a fullscreen button, and the cover art uses the real screenshots.
+
+## New mini games (added 2026-10-27, all free)
+Six original canvas games in `games/` using the shared `js/play.js` engine, registered in `js/data.js` (pack `mini6`, category Arcade) with procedural covers in `js/covers.js` and a "New mini games" row on the home page:
+`colorblast.js` (Color Blast 3 · 50 levels + 60-second mode), `lanerush.js` (Turbo Lane Rush · 8 runners, 30 missions, daily challenge),
+`bubblekingdom.js` (Bubble Kingdom · 100 levels), `soldierstrike.js` (Mini Soldier Strike · 40 missions, 10 weapons, 5 bosses),
+`parking.js` (Parking Escape · 100 BFS-verified levels), `skytower.js` (Sky Tower Stack · endless + 30 challenges, 6 themes).
+Progress, coins and high scores are saved in localStorage (`gv_colorblast`, `gv_lanerush`, `gv_bubblekingdom`, `gv_soldierstrike`, `gv_parking`, `gv_skytower`).

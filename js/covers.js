@@ -75,9 +75,63 @@
       var I = '<g transform="translate(300 30)">' + [0, 22, 44, 66].map(function (y) { return '<rect x="0" y="' + y + '" width="19" height="19" rx="4" fill="#00d4ff"/>'; }).join("") + '</g>';
       return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0f2c"/><stop offset="1" stop-color="#1b0636"/></linearGradient><filter id="f' + u + '"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>' +
         '<rect width="400" height="225" fill="url(#s' + u + ')"/>' + stars(r, 30, 400, 120) + '<g filter="url(#f' + u + ')">' + T + L + I + o + '</g>';
+    },
+    /* --- new mini games (pack mini6) --- */
+    match3: function (u, r, v) {
+      var cols = ["#ff4d6d", "#3fa9ff", "#39ff88", "#ffd23f", "#b06bff"], o = "";
+      for (var y = 0; y < 5; y++) for (var x = 0; x < 9; x++) { var k = Math.floor(r() * 5), cx = 30 + x * 43, cy = 25 + y * 43;
+        o += '<circle cx="' + cx + '" cy="' + cy + '" r="17" fill="' + cols[k] + '"/><ellipse cx="' + (cx - 6) + '" cy="' + (cy - 7) + '" rx="6" ry="3.5" fill="#fff" opacity=".6"/>'; }
+      return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b0636"/><stop offset="1" stop-color="' + (v ? "#0a3d62" : "#3a0ca3") + '"/></linearGradient><filter id="f' + u + '"><feGaussianBlur stdDeviation="4"/></filter></defs>' +
+        '<rect width="400" height="225" fill="url(#s' + u + ')"/>' + o + '<circle cx="200" cy="112" r="40" fill="#fff" opacity=".35" filter="url(#f' + u + ')"/>' +
+        '<g transform="translate(200 112)"><circle r="24" fill="#ffd23f" stroke="#fff" stroke-width="4"/><path d="M-12 0h24M0-12v24" stroke="#ff2bd6" stroke-width="5" stroke-linecap="round"/></g>';
+    },
+    lanes: function (u, r, v) {
+      var d = ""; for (var i = 0; i < 6; i++) d += '<rect x="148" y="' + (i * 42 - 10) + '" width="5" height="24" fill="#fff" opacity=".4"/><rect x="247" y="' + (i * 42 + 6) + '" width="5" height="24" fill="#fff" opacity=".4"/>';
+      var co = ""; for (var j = 0; j < 5; j++) co += '<circle cx="100" cy="' + (40 + j * 26) + '" r="8" fill="#ffd23f" stroke="#ffb300" stroke-width="2"/>';
+      return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b0f2a"/><stop offset="1" stop-color="#1a0b2e"/></linearGradient></defs><rect width="400" height="225" fill="url(#s' + u + ')"/>' +
+        '<rect x="0" y="0" width="45" height="225" fill="#121736"/><rect x="355" y="0" width="45" height="225" fill="#121736"/><g opacity=".6"><rect x="8" y="20" width="28" height="60" fill="#ff2bd6"/><rect x="8" y="120" width="28" height="60" fill="#00d4ff"/><rect x="364" y="60" width="28" height="60" fill="#00d4ff"/><rect x="364" y="160" width="28" height="50" fill="#ff2bd6"/></g>' +
+        '<rect x="50" y="0" width="300" height="225" fill="#1c2140"/><path d="M52 0V225M348 0V225" stroke="#00d4ff" stroke-width="4"/>' + d + co +
+        '<g transform="translate(270 10)"><rect width="70" height="100" rx="12" fill="' + (v ? "#39ff88" : "#ff5a3c") + '"/><rect x="8" y="14" width="54" height="22" rx="6" fill="#bfe9ff" opacity=".8"/></g>' +
+        '<rect x="155" y="120" width="90" height="16" rx="5" fill="#ff8a00"/>' +
+        '<g transform="translate(200 175)"><ellipse cx="0" cy="34" rx="22" ry="6" fill="#000" opacity=".4"/><path d="M-7 8 L-12 30 M7 8 L12 28" stroke="#0062ff" stroke-width="8" stroke-linecap="round"/><rect x="-14" y="-16" width="28" height="28" rx="9" fill="#00d4ff"/><circle cx="0" cy="-26" r="11" fill="#ffe0bd"/><path d="M-11-28 a11 11 0 0 1 22 0z" fill="#00d4ff"/></g>';
+    },
+    bubbles: function (u, r, v) {
+      var cols = ["#ff4d6d", "#3fa9ff", "#39ff88", "#ffd23f", "#b06bff", "#ff8a3d"], o = "";
+      for (var y = 0; y < 3; y++) for (var x = 0; x < 11; x++) { var cx = 22 + x * 36 + (y % 2 ? 18 : 0), cy = 22 + y * 31; if (cx > 390) continue;
+        o += '<circle cx="' + cx + '" cy="' + cy + '" r="17" fill="' + cols[Math.floor(r() * 6)] + '"/><ellipse cx="' + (cx - 6) + '" cy="' + (cy - 7) + '" rx="6" ry="3.5" fill="#fff" opacity=".6"/>'; }
+      return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b0f3b"/><stop offset="1" stop-color="' + (v ? "#06283d" : "#0a1a3d") + '"/></linearGradient></defs><rect width="400" height="225" fill="url(#s' + u + ')"/>' +
+        '<g fill="#fff" opacity=".07"><rect x="20" y="130" width="50" height="95"/><rect x="110" y="110" width="50" height="115"/><rect x="250" y="120" width="50" height="105"/><rect x="330" y="140" width="50" height="85"/></g>' + o +
+        '<g transform="translate(200 40)"><circle r="17" fill="#ffd23f"/><path d="M0-11 l3 7 8 .5 -6 5 2 8 -7-4 -7 4 2-8 -6-5 8-.5z" fill="#fff8c4"/></g>' +
+        '<path d="M200 200 L150 120" stroke="#fff" stroke-width="3" stroke-dasharray="4 8" opacity=".7"/>' +
+        '<g transform="translate(200 205)"><path d="M-36 20 a36 36 0 0 1 72 0z" fill="#24164a" stroke="#ffd23f" stroke-width="3"/><circle cy="-4" r="17" fill="#3fa9ff"/></g>';
+    },
+    defence: function (u, r, v) {
+      var en = ""; for (var i = 0; i < 5; i++) { var x = 40 + i * 78 + r() * 20, y = 30 + r() * 70;
+        en += i % 2 ? '<g transform="translate(' + x + ' ' + y + ')"><path d="M-22 -4H22" stroke="#9fb3d1" stroke-width="3"/><ellipse rx="14" ry="10" fill="#ff2bd6"/><circle r="4" fill="#ff3b3b"/></g>'
+          : '<g transform="translate(' + x + ' ' + y + ')"><rect x="-16" y="-12" width="32" height="22" rx="5" fill="#9fb3d1"/><rect x="-11" y="-24" width="22" height="14" rx="4" fill="#2b3350"/><rect x="-7" y="-19" width="14" height="4" fill="#ff3b3b"/><rect x="-12" y="10" width="8" height="12" fill="#1a1f33"/><rect x="4" y="10" width="8" height="12" fill="#1a1f33"/></g>'; }
+      return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1430"/><stop offset="1" stop-color="' + (v ? "#3a1a0a" : "#1b2a1f") + '"/></linearGradient></defs><rect width="400" height="225" fill="url(#s' + u + ')"/>' +
+        '<g stroke="#39ff88" stroke-opacity=".1">' + [40, 80, 120, 160].map(function (y) { return '<path d="M0 ' + y + 'H400"/>'; }).join("") + '</g>' + en +
+        '<path d="M200 185 L120 70" stroke="#ffd23f" stroke-width="3"/><path d="M200 185 L262 60" stroke="#ffd23f" stroke-width="3" opacity=".6"/>' +
+        '<rect x="0" y="180" width="400" height="45" fill="#2a2f45"/><g fill="#ffd23f">' + [0, 40, 80, 120, 160, 200, 240, 280, 320, 360].map(function (x) { return '<rect x="' + (x + 20) + '" y="176" width="20" height="4"/>'; }).join("") + '</g>' +
+        '<g transform="translate(200 195)"><rect x="0" y="-6" width="40" height="12" rx="3" fill="#1a1f33" transform="rotate(-125)"/><circle r="16" fill="#3d6b3a"/><path d="M-13 -2 a13 13 0 0 1 26 0z" fill="#2c4f2a"/></g>';
+    },
+    parking: function (u, r, v) {
+      var cars = [[1, 2, 2, 1, "#ff3b3b"], [0, 0, 1, 3, "#ffd23f"], [3, 0, 3, 1, "#3fa9ff"], [4, 1, 1, 2, "#39ff88"], [5, 2, 1, 3, "#b06bff"], [2, 4, 2, 1, "#ff8a3d"], [0, 4, 1, 2, "#00d4ff"]], o = "", S = 34, X = 98, Y = 10;
+      cars.forEach(function (c) { o += '<rect x="' + (X + c[0] * S + 3) + '" y="' + (Y + c[1] * S + 3) + '" width="' + (c[2] * S - 6) + '" height="' + (c[3] * S - 6) + '" rx="8" fill="' + c[4] + '"/><rect x="' + (X + c[0] * S + 9) + '" y="' + (Y + c[1] * S + 9) + '" width="' + (c[2] * S - 18) + '" height="' + (c[3] * S - 18) + '" rx="5" fill="#fff" opacity=".35"/>'; });
+      return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + (v ? "#0a3d2a" : "#101a3a") + '"/><stop offset="1" stop-color="#05070d"/></linearGradient></defs><rect width="400" height="225" fill="url(#s' + u + ')"/>' +
+        '<rect x="' + (X - 6) + '" y="' + (Y - 6) + '" width="' + (6 * S + 12) + '" height="' + (6 * S + 12) + '" rx="12" fill="#2a2f45" stroke="#00d4ff" stroke-width="3"/>' +
+        '<rect x="' + (X + 6 * S + 2) + '" y="' + (Y + 2 * S) + '" width="14" height="' + S + '" fill="#2a2f45"/><path d="M' + (X + 6 * S + 24) + ' ' + (Y + 2.5 * S) + ' l14 0 m-6 -7 l7 7 -7 7" stroke="#39ff88" stroke-width="4" fill="none" stroke-linecap="round"/>' + o;
+    },
+    tower: function (u, r, v) {
+      var o = "", w = 150, x = 125;
+      for (var i = 0; i < 7; i++) { w -= 8 + r() * 10; x += (r() - .5) * 16 + 4; o += '<rect x="' + x.toFixed(1) + '" y="' + (195 - (i + 1) * 22) + '" width="' + w.toFixed(1) + '" height="20" rx="3" fill="hsl(' + ((v ? 290 : 195) + i * 11) + ',85%,58%)"/>'; }
+      return '<defs><linearGradient id="s' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + (v ? "#2b0a4f" : "#4ab3ff") + '"/><stop offset="1" stop-color="' + (v ? "#07021a" : "#bfe9ff") + '"/></linearGradient></defs><rect width="400" height="225" fill="url(#s' + u + ')"/>' +
+        (v ? stars(r, 40, 400, 225) : '<g fill="#fff" opacity=".8"><ellipse cx="70" cy="50" rx="34" ry="12"/><ellipse cx="330" cy="80" rx="40" ry="13"/></g>') +
+        '<rect x="0" y="195" width="400" height="30" fill="' + (v ? "#140a2e" : "#3b7a3a") + '"/>' + o +
+        '<rect x="' + (x + 40) + '" y="20" width="' + (w - 10).toFixed(1) + '" height="20" rx="3" fill="#ffd23f"/><path d="M' + (x + 20) + ' 30 h-20 m' + (w + 60).toFixed(0) + ' 0 h20" stroke="#fff" stroke-width="3" stroke-dasharray="5 5"/>';
     }
   };
-  var MAP = { "shadow-front": "soldier", "sniper-range": "range", "deep-sea-strike": "sub", "deep-sea-patrol": "sub", "turbo-racing": "racer", "turbo-rush": "racer", "dino-adventure": "dino", "dino-dash": "dino", "memory-jungle": "memory", "neon-snake": "snake", "star-vanguard": "space", "neon-blocks": "blocks" };
+  var MAP = { "shadow-front": "soldier", "sniper-range": "range", "deep-sea-strike": "sub", "deep-sea-patrol": "sub", "turbo-racing": "racer", "turbo-rush": "racer", "dino-adventure": "dino", "dino-dash": "dino", "memory-jungle": "memory", "neon-snake": "snake", "star-vanguard": "space", "neon-blocks": "blocks", "color-blast-3": "match3", "turbo-lane-rush": "lanes", "bubble-kingdom": "bubbles", "mini-soldier-strike": "defence", "parking-escape": "parking", "sky-tower-stack": "tower" };
 
   /** Returns an inline SVG string for a game cover. variant 0/1 gives alternate art. */
   window.GVCover = function (id, variant, label) {
