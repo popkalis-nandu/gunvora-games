@@ -42,7 +42,9 @@ gunvora-games/
 ├── about.html  contact.html
 ├── privacy.html terms.html refund.html shipping.html cookies.html disclaimer.html grievance.html
 ├── 404.html  robots.txt  sitemap.xml  site.webmanifest
-├── css/style.css       The entire theme (black + neon blue, responsive)
+├── games/<slug>/       Full web builds of our standalone games, embedded via play.html (iframe mode)
+├── assets/shots/       Real screenshots used as cover art (<slug>-1..3.jpg)
+├── css/style.css       The entire theme (bright corporate: light surfaces, indigo + orange, Inter / Plus Jakarta Sans, responsive)
 ├── js/
 │   ├── config.js       ★ THE file you edit: business details, prices, PAYMENT LINKS, codes
 │   ├── data.js         Game catalogue, categories, store items
@@ -236,3 +238,7 @@ Any of the three gives you free HTTPS. Point your domain's DNS at the host and u
 * The "coming soon" flagship titles are represented by playable lite versions.
 * Without an endpoint, the contact form opens the visitor's email app.
 * Sound effects are simple synthesized blips (WebAudio). There are no music files.
+
+
+## Embedded web games (added 2026-10-27)
+Standalone games live in `games/<slug>/`. In `js/data.js` set `embed: "games/<slug>/"`, `orientation: "landscape"|"portrait"` and `shots: N` (number of `assets/shots/<slug>-N.jpg` screenshots). `play.html?id=<slug>` then loads the game full-size in an iframe with a fullscreen button, and the cover art uses the real screenshots.

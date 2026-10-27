@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#07080c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="VYRONIQ RACING: an original open-wheel 3D racing game for the browser.">
+<title>VYRONIQ RACING</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preload" href="assets/logo.png" as="image">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+</head>
+<body data-screen="splash">
+<!-- BALA HR start-up splash (self-contained; tap or any key skips) -->
+<style>
+#bhSplash{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2vmin;background:radial-gradient(ellipse at center,#1d2a4a 0%,#0a0f1f 55%,#05070d 100%);opacity:1;transition:opacity .6s ease;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#bhSplash.out{opacity:0;pointer-events:none}
+#bhSplash img{display:block;max-width:70vw;max-height:70vh;max-height:70dvh;width:auto;height:auto;object-fit:contain;filter:drop-shadow(0 0 3vmin rgba(255,170,40,.35));opacity:0;transform:scale(.86);transition:opacity .7s ease,transform 1.1s cubic-bezier(.2,.8,.2,1)}
+#bhSplash.in img{opacity:1;transform:scale(1)}
+#bhSplash p{margin:0;font:600 clamp(11px,2.4vmin,16px)/1.2 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.25em;text-transform:uppercase;color:#c9d3ea;opacity:0;transition:opacity .8s ease .4s}
+#bhSplash.in p{opacity:.8}
+@media (prefers-reduced-motion:reduce){#bhSplash img{transform:none;transition:opacity .3s}}
+</style>
+<div id="bhSplash" role="img" aria-label="Presented by BALA HR (@popkalis). Tap to skip."><img id="bhSplashImg" src="assets/logo.png" alt="BALA HR @popkalis logo" width="560" height="542" decoding="async"><p>Presented by BALA HR</p></div>
+<script>
+(function(){
+  var s=document.getElementById('bhSplash'),img=document.getElementById('bhSplashImg'),done=false,shown=false,t1,t2;
+  if(!s)return;
+  function end(fast){
+    if(done)return;done=true;clearTimeout(t1);clearTimeout(t2);
+    s.classList.add('out');
+    setTimeout(function(){if(s.parentNode)s.parentNode.removeChild(s);window.dispatchEvent(new Event('bhsplashdone'));},fast?150:650);
+    document.removeEventListener('keydown',onKey,true);
+  }
+  function onKey(e){if(e.key==="Tab")return;e.preventDefault();e.stopPropagation();end();}
+  function show(){
+    if(shown||done)return;shown=true;
+    requestAnimationFrame(function(){s.classList.add('in');});
+    t1=setTimeout(end,2500);
+  }
+  // click (not pointerdown) so the tap is consumed by the splash and does not hit menu buttons underneath
+  s.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();end();});
+  document.addEventListener('keydown',onKey,true);
+  img.addEventListener('error',function(){end(true);});
+  if(img.complete&&img.naturalWidth)show();else img.addEventListener('load',show);
+  t2=setTimeout(function(){if(!shown)end(true);},2000); // image too slow: skip
+  window.__bhSplash={end:end};
+})();
+</script>
+<canvas id="gl" aria-hidden="true"></canvas>
+<div id="sr" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+<div id="coinbar" hidden><button class="coinbtn" data-go="profile" aria-label="V-Coin balance, open profile"><span class="coin">◆</span> <b id="coinAmt">0</b> <small>V-Coins</small></button></div>
+
+<section id="scr-splash" class="scr">
+  <div class="splash">
+    <div class="logo"><span>VYRONIQ</span><em>RACING</em></div>
+    <p class="tag">Open-wheel racing · original cars and circuits</p>
+    <button id="btnStart" class="btn primary big">Tap to start</button>
+    <p class="dim small">Best in landscape. Runs fullscreen on phones. Progress is saved in this browser.</p>
+  </div>
+</section>
+
+<section id="scr-home" class="scr" hidden>
+  <div class="panel left home">
+    <h1 class="logo sm"><span>VYRONIQ</span><em>RACING</em></h1>
+    <div class="tiles">
+      <button class="tile hero" data-go="setup"><b>Quick Race</b><small>Pick circuit, laps, weather and AI</small></button>
+      <button class="tile" data-go="career"><b>Career</b><small>3 championships</small></button>
+      <button class="tile" data-go="tt"><b>Time Trial</b><small>Beat your ghost</small></button>
+      <button class="tile" data-go="garage"><b>Garage</b><small>Cars and liveries</small></button>
+      <button class="tile" data-go="showroom"><b>Showroom</b><small>Buy new cars</small></button>
+      <button class="tile" data-go="workshop"><b>Workshop</b><small>8 upgrade paths</small></button>
+      <button class="tile" data-go="profile"><b>Profile</b><small>Stats and V-Coin log</small></button>
+      <button class="tile" data-go="settings"><b>Settings</b><small>Graphics, controls, access</small></button>
+    </div>
+    <div id="dailyBox" class="daily"></div>
+    <p class="dim small">Racing with: <span id="homeCar"></span></p>
+  </div>
+</section>
+
+<section id="scr-garage" class="scr" hidden>
+  <div class="panel left"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1>Garage</h1></div>
+    <div id="garageList" class="chips"></div><div id="garageBody"></div></div>
+</section>
+
+<section id="scr-showroom" class="scr" hidden>
+  <div class="panel left wide show"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1>Showroom</h1></div>
+    <div class="showgrid"><div id="showList" class="cards"></div><div id="showBody" class="showbody"></div></div></div>
+</section>
+
+<section id="scr-workshop" class="scr" hidden>
+  <div class="panel left wide"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1>Upgrade workshop</h1></div>
+    <div id="wsCars" class="chips"></div><div class="wsgrid"><div id="wsList" class="ups"></div><div id="wsStats"></div></div></div>
+</section>
+
+<section id="scr-setup" class="scr" hidden>
+  <div class="panel left wide"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1 id="setupTitle">Quick Race</h1></div>
+    <div id="setupBody"></div><div class="row sticky"><button id="setupGo" class="btn primary big">Start race</button></div></div>
+</section>
+
+<section id="scr-career" class="scr" hidden>
+  <div class="panel left wide"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1>Career</h1></div>
+    <div id="champList" class="cards row3"></div><div id="champBody"></div></div>
+</section>
+
+<section id="scr-profile" class="scr" hidden>
+  <div class="panel left wide"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1>Profile</h1></div><div id="profBody"></div></div>
+</section>
+
+<section id="scr-settings" class="scr" hidden>
+  <div class="panel left wide"><div class="hdr"><button class="back" data-go="home" aria-label="Back">‹</button><h1>Settings</h1></div><div id="setBody" class="setgrid"></div></div>
+</section>
+
+<section id="scr-loading" class="scr" hidden>
+  <div class="loading"><div class="logo sm"><span>VYRONIQ</span><em>RACING</em></div><div class="spinner" aria-hidden="true"></div><h2 id="loadInfo">Loading</h2><p id="loadTip" class="dim"></p></div>
+</section>
+
+<section id="scr-hud" class="scr hud" hidden>
+  <div class="hud-tl">
+    <div class="pos"><span class="lbl">POS</span><b id="hudPos">1</b><small id="hudPosTot">/10</small></div>
+    <div class="lap"><span class="lbl">LAP</span><b id="hudLap">1</b><small id="hudLapTot">/3</small></div>
+    <div class="times"><b id="hudTime">0:00.000</b><div><span>LAST <em id="hudLast">—</em></span><span>BEST <em id="hudBest">—</em></span><span>PB <em id="hudPB">—</em></span></div><div id="hudSec" class="sec"></div><div id="hudSplit"></div><div id="ttDelta" hidden></div></div>
+  </div>
+  <div class="hud-tr"><canvas id="minimap" width="200" height="150" aria-label="Mini-map"></canvas><div id="order" class="order"></div></div>
+  <div id="flash" role="status"></div>
+  <div id="lights" hidden><div class="lamps"><i></i><i></i><i></i><i></i><i></i></div><p id="lightsTip"></p></div>
+  <div class="hud-bc">
+    <div class="ind"><span id="slipInd" hidden>SLIPSTREAM</span><span id="offInd" hidden>OFF TRACK</span><span id="pitInd" hidden>PIT</span></div>
+    <div class="dash">
+      <div class="tyre"><span id="tyreIc">M</span><b id="tyreWear">100%</b></div>
+      <div class="spd"><b id="hudSpd">0</b><small id="hudSpdU">km/h</small></div>
+      <div class="gear"><b id="hudGear">1</b><small>GEAR</small></div>
+      <div class="energy"><small>ENERGY</small><i><b id="enBar"></b></i><em id="enTxt">100</em></div>
+    </div>
+    <div class="rpm"><b id="rpmBar"></b></div>
+  </div>
+  <div class="tbar"><button data-touch="pause" class="tb" aria-label="Pause">❚❚</button><button data-touch="cam" class="tb" aria-label="Change camera">CAM</button><button data-touch="pit" class="tb" aria-label="Request pit stop">PIT</button><button data-touch="tyre" class="tb" aria-label="Choose pit tyre">TYRE</button></div>
+  <div class="touch tc-steer"><button data-touch="left" class="tbtn" aria-label="Steer left">◀</button><button data-touch="right" class="tbtn" aria-label="Steer right">▶</button></div>
+  <div class="touch tc-pedal"><button data-touch="boost" class="tbtn boost" aria-label="Energy boost">⚡</button><button data-touch="brk" class="tbtn brk" aria-label="Brake">BRAKE</button><button data-touch="thr" class="tbtn thr" aria-label="Throttle">GAS</button>
+    <div class="gearbtns"><button data-touch="down" class="tbtn sm" aria-label="Shift down">−</button><button data-touch="up" class="tbtn sm" aria-label="Shift up">+</button></div></div>
+</section>
+
+<section id="scr-pause" class="scr" hidden>
+  <div class="panel center"><h1>Paused</h1><p id="pauseInfo" class="dim"></p>
+    <div class="col"><button id="pResume" class="btn primary big">Resume</button><button id="pRestart" class="btn">Restart</button><button id="pEnd" class="btn" hidden>End session</button>
+    <div class="row"><button id="pCam" class="btn sm">Camera</button><button id="pLine" class="btn sm">Racing line</button><button id="pCal" class="btn sm">Re-centre tilt</button></div>
+    <button id="pQuit" class="btn ghost">Quit to menu</button></div></div>
+</section>
+
+<section id="scr-results" class="scr" hidden>
+  <div class="panel center wide"><div id="resBody"></div><div class="row"><button id="resNext" class="btn primary">Race again</button><button id="resHome" class="btn">Home</button></div></div>
+</section>
+
+<div id="toast" role="status"></div>
+<div id="modal" hidden></div>
+<div id="noGL" class="nogl" hidden><h2>WebGL is not available</h2><p>VYRONIQ RACING needs a browser with WebGL (Chrome, Edge, Firefox or Safari with hardware acceleration on).</p></div>
+<noscript><p class="nogl">VYRONIQ RACING needs JavaScript.</p></noscript>
+<script type="module" src="game.js"></script>
+</body>
+</html>

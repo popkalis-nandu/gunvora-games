@@ -42,8 +42,35 @@
       main.querySelector(".play-wrap").innerHTML = '<div class="lock"><div class="detail-cover">' + GVCover(g.id, 0, g.title) + '</div><span class="badge prem">★ Premium game</span><h1 style="margin-top:12px">' + GV.esc(g.title) + '</h1><p class="muted">' + GV.esc(g.tagline) + ' This game is included with Jarvis Premium — ad-free play plus every premium game, from ' + GV.price(GV.cfg.plans.monthly.price) + '/month.</p><div class="actions" style="justify-content:center"><a class="btn gold" href="pricing.html">★ Get Premium</a><a class="btn ghost" href="redeem.html">I have an unlock code</a></div><p class="small muted" style="margin-top:18px"><a href="games.html?filter=free">Or play one of our free games →</a></p></div>';
       return;
     }
+    if (g.embed) { embed(); return; }
     var s = document.createElement("script"); s.src = "games/" + g.script; s.onerror = function () { $("#ov-title").textContent = "Couldn't load the game. Please refresh."; }; document.body.appendChild(s);
   });
+
+  /* ---------- full web games: run in a sandboxed-size iframe from games/<slug>/ ---------- */
+  function embed() {
+    var stage = $("#stage"), wrap = document.querySelector(".play-wrap");
+    wrap.classList.add("embed-mode");
+    stage.className = "stage embed " + (g.orientation === "portrait" ? "portrait" : "landscape");
+    stage.innerHTML = '<iframe id="game-frame" src="' + GV.esc(g.embed) + '" title="' + GV.esc(g.title) + '" allow="fullscreen; autoplay; gamepad; accelerometer; gyroscope; screen-wake-lock; clipboard-write; web-share" allowfullscreen loading="eager"></iframe>' +
+      '<div class="embed-loading" id="embed-loading"><div class="spinner" aria-hidden="true"></div><span>Loading ' + GV.esc(g.title) + '…</span></div>';
+    var f = $("#game-frame");
+    f.addEventListener("load", function () { var l = $("#embed-loading"); if (l) l.remove(); try { f.contentWindow.focus(); } catch (e) { } });
+    var tools = document.createElement("div"); tools.className = "embed-tools";
+    tools.innerHTML = '<button class="btn sm" id="embed-full" type="button">⛶ Fullscreen</button><a class="btn ghost sm" href="' + GV.esc(g.embed) + '" target="_blank" rel="noopener">Open in new tab ↗</a>' +
+      '<span class="small muted">Tip: click inside the game to give it keyboard focus.' + (g.orientation === "landscape" ? " On phones, rotate to landscape." : "") + '</span>';
+    stage.parentNode.insertBefore(tools, stage.nextSibling);
+    $("#embed-full").addEventListener("click", function () {
+      var el = stage;
+      if (document.fullscreenElement) { document.exitFullscreen(); return; }
+      (el.requestFullscreen || el.webkitRequestFullscreen || function () { }).call(el);
+    });
+    var c = g.controls || [];
+    if (c.length) {
+      var how = document.createElement("section"); how.className = "panel embed-help";
+      how.innerHTML = '<h2>Controls</h2><table class="keys"><tbody>' + c.map(function (k) { return '<tr><td><kbd>' + GV.esc(k[0]) + '</kbd></td><td>' + GV.esc(k[1]) + '</td></tr>'; }).join("") + '</tbody></table>';
+      tools.parentNode.insertBefore(how, tools.nextSibling);
+    }
+  }
 
   /* ---------- engine ---------- */
   function boot() {

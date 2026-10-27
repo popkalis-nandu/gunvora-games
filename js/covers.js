@@ -81,6 +81,11 @@
 
   /** Returns an inline SVG string for a game cover. variant 0/1 gives alternate art. */
   window.GVCover = function (id, variant, label) {
+    var gm = window.GV && GV.game ? GV.game(id) : null;
+    if (gm && gm.shots) {
+      var n = Math.min(gm.shots, (variant || 0) + 1);
+      return '<img class="cover-img" src="assets/shots/' + id + '-' + n + '.jpg" alt="' + (label || gm.title) + '" loading="lazy" decoding="async" width="800" height="450">';
+    }
     var kind = MAP[id] || "space", u = "c" + (n++);
     var r = rng(hash(id) + (variant || 0) * 977);
     return '<svg class="cover-svg" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" role="img" aria-label="' + (label || "Game cover art") + '" xmlns="http://www.w3.org/2000/svg">' + ART[kind](u, r, variant || 0) + '</svg>';

@@ -84,7 +84,6 @@ window.GV_CONFIG = {
   /* ---------- Android (Google Play) links — leave "" to show "Coming soon" ---------- */
   androidLinks: {
     "shadow-front": "",
-    "deep-sea-strike": "",
     "turbo-racing": "",
     "dino-adventure": "",
     "sniper-range": "",

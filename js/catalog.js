@@ -7,8 +7,12 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     /* homepage rows */
-    var hero = $("#hero-art"); if (hero) hero.innerHTML = GVCover("shadow-front", 0, "Shadow Front key art");
-    var heroPlay = $("#hero-play"); if (heroPlay) heroPlay.innerHTML = GV.playBadge("shadow-front");
+    var hero = $("#hero-art");
+    if (hero) hero.innerHTML = '<a class="ha-main" href="game.html?id=shadow-strike" tabindex="-1">' + GVCover("shadow-strike", 0, "Shadow Strike") + '<span class="ha-tag">🎯 Shadow Strike <b>FREE</b></span></a>' +
+      '<a class="ha-mini m1" href="game.html?id=deep-sea-strike" tabindex="-1">' + GVCover("deep-sea-strike", 0, "Deep Sea Strike") + '</a>' +
+      '<a class="ha-mini m2" href="game.html?id=upstaggles" tabindex="-1">' + GVCover("upstaggles", 0, "Upstaggles") + '</a>';
+    var stG = $("#st-games"); if (stG) stG.textContent = playable.length;
+    var stF = $("#st-free"); if (stF) stF.textContent = Math.round(100 * playable.filter(function (g) { return !g.premium; }).length / playable.length) + "%";
     fill($("#row-trending"), playable.slice().sort(function (a, b) { return a.trending - b.trending; }).slice(0, 8));
     fill($("#row-new"), G.slice().sort(function (a, b) { return b.added < a.added ? -1 : 1; }).slice(0, 8));
     fill($("#grid-online"), playable);

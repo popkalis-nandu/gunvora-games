@@ -80,10 +80,11 @@
   /* ---------- logo ---------- */
   GV.logo = function (size) {
     size = size || 34;
-    return '<svg class="brand-mark" width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg-a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00d4ff"/><stop offset="1" stop-color="#7b5cff"/></linearGradient></defs>' +
-      '<path d="M32 3 L57 17.5 V46.5 L32 61 L7 46.5 V17.5Z" fill="#05070d" stroke="url(#lg-a)" stroke-width="3.5"/>' +
-      '<path d="M24 18 H44 M37 18 V37 A9 9 0 0 1 19 37" fill="none" stroke="url(#lg-a)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-      '<circle cx="46" cy="44" r="3" fill="#ff2bd6"/></svg>';
+    var u = "lg" + Math.random().toString(36).slice(2, 7);
+    return '<svg class="brand-mark" width="' + size + '" height="' + size + '" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset=".55" stop-color="#4338ca"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs>' +
+      '<rect x="2" y="2" width="60" height="60" rx="16" fill="url(#' + u + ')"/>' +
+      '<path d="M22 19 H44 M36 19 V38 A9.5 9.5 0 0 1 17 38" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<circle cx="47" cy="45" r="4.5" fill="#f97316" stroke="#fff" stroke-width="2"/></svg>';
   };
 
   /* ---------- cards ---------- */
@@ -107,7 +108,7 @@
   /* ---------- Google Play badge (placeholder until link is set in config) ---------- */
   GV.playBadge = function (id) {
     var url = (C.androidLinks || {})[id];
-    var icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#00d4ff" d="M3.6 1.8 13.4 12 3.6 22.2c-.4-.2-.6-.6-.6-1.1V2.9c0-.5.2-.9.6-1.1z"/><path fill="#39ff88" d="m16.8 8.6-3.4 3.4-9.8-10.2c.2-.1.6-.1.9.1l12.3 6.7z"/><path fill="#ffd23f" d="m20.4 10.6c.8.5.8 1.8 0 2.3l-3.6 2-3.4-2.9 3.4-3.4 3.6 2z"/><path fill="#ff4d5e" d="M13.4 12l3.4 3.4-12.3 6.7c-.3.2-.6.2-.9.1L13.4 12z"/></svg>';
+    var icon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#22d3ee" d="M3.6 1.8 13.4 12 3.6 22.2c-.4-.2-.6-.6-.6-1.1V2.9c0-.5.2-.9.6-1.1z"/><path fill="#39ff88" d="m16.8 8.6-3.4 3.4-9.8-10.2c.2-.1.6-.1.9.1l12.3 6.7z"/><path fill="#ffd23f" d="m20.4 10.6c.8.5.8 1.8 0 2.3l-3.6 2-3.4-2.9 3.4-3.4 3.6 2z"/><path fill="#ff4d5e" d="M13.4 12l3.4 3.4-12.3 6.7c-.3.2-.6.2-.9.1L13.4 12z"/></svg>';
     var inner = icon + '<span class="pb-t"><small>' + (url ? "Get it on" : "Soon on") + '</small><strong>Google Play</strong></span>';
     if (url) return '<a class="play-badge" href="' + GV.esc(url) + '" target="_blank" rel="noopener">' + inner + '</a>';
     return '<span class="play-badge soon" role="img" aria-label="Google Play – coming soon" title="Android version coming soon">' + inner + '</span>';
@@ -119,8 +120,8 @@
     var h = GV.$("#site-header"); if (!h) return;
     var here = location.pathname.split("/").pop() || "index.html";
     h.className = "site-header";
-    h.innerHTML = '<a class="skip" href="#main">Skip to content</a><div class="wrap nav-row">' +
-      '<a class="brand" href="index.html" aria-label="' + GV.esc(C.siteName) + ' home">' + GV.logo(36) + '<span class="brand-name"><span class="bn-top">Gaming World of</span><span class="bn-main">JARVIS</span></span></a>' +
+    h.innerHTML = '<a class="skip" href="#main">Skip to content</a><div class="topbar"><div class="wrap"><span>🎮 ' + (window.GV_GAMES ? GV_GAMES.filter(function (g) { return g.status === "playable"; }).length + " games to play" : "Browser games") + ' · 75%+ free forever</span><span>🔒 Secure payments</span><span>🇮🇳 Made in India</span><a href="pricing.html">Go ad-free with Premium →</a></div></div><div class="wrap nav-row">' +
+      '<a class="brand" href="index.html" aria-label="' + GV.esc(C.siteName) + ' home">' + GV.logo(36) + '<span class="brand-name"><span class="bn-top">Gaming World of</span><span class="bn-main">JARV<b>I</b>S</span></span></a>' +
       '<form class="search" role="search" action="games.html"><label class="sr-only" for="hdr-q">Search games</label><input id="hdr-q" name="q" type="search" placeholder="Search games…" autocomplete="off"><button aria-label="Search">⌕</button></form>' +
       '<button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="main-nav">☰</button>' +
       '<nav id="main-nav" class="main-nav" aria-label="Main">' + NAV.map(function (n) { return '<a href="' + n[0] + '"' + (n[0] === here ? ' aria-current="page"' : '') + '>' + n[1] + '</a>'; }).join("") +
@@ -138,7 +139,8 @@
       ["Company", [["about.html", "About us"], ["contact.html", "Contact us"], ["grievance.html", "Grievance officer"]]],
       ["Legal", [["privacy.html", "Privacy policy"], ["terms.html", "Terms & conditions"], ["refund.html", "Refund & cancellation"], ["shipping.html", "Shipping & delivery"], ["cookies.html", "Cookie policy"], ["disclaimer.html", "Disclaimer"]]]
     ];
-    f.innerHTML = '<div class="wrap"><div class="foot-grid"><div class="foot-brand"><a class="brand" href="index.html">' + GV.logo(40) + '<span class="brand-name"><span class="bn-top">Gaming World of</span><span class="bn-main">JARVIS</span></span></a><p>' + GV.esc(C.tagline) + '</p><p class="small muted">' + GV.esc(C.businessName) + '<br>' + GV.esc(C.address) + (C.gstin ? '<br>GSTIN: ' + GV.esc(C.gstin) : '') + '<br><a href="mailto:' + GV.esc(C.contactEmail) + '">' + GV.esc(C.contactEmail) + '</a></p></div>' +
+    var trust = [["🔒", "Secure payments", "UPI, cards & net-banking via trusted gateways"], ["👨‍👩‍👧", "Family-friendly", "Kids games: no ads, no purchases"], ["🇮🇳", "Made in India", "Original games, built with care"], ["⚡", "No download", "Play instantly in your browser"]];
+    f.innerHTML = '<div class="wrap"><div class="foot-trust">' + trust.map(function (t) { return '<div><span aria-hidden="true">' + t[0] + '</span><div>' + t[1] + '<small>' + t[2] + '</small></div></div>'; }).join("") + '</div><div class="foot-grid"><div class="foot-brand"><a class="brand" href="index.html">' + GV.logo(40) + '<span class="brand-name"><span class="bn-top">Gaming World of</span><span class="bn-main">JARV<b>I</b>S</span></span></a><p>' + GV.esc(C.tagline) + '</p><p class="small muted">' + GV.esc(C.businessName) + '<br>' + GV.esc(C.address) + (C.gstin ? '<br>GSTIN: ' + GV.esc(C.gstin) : '') + '<br><a href="mailto:' + GV.esc(C.contactEmail) + '">' + GV.esc(C.contactEmail) + '</a></p><div class="pay-logos" aria-label="Accepted payment methods"><span>UPI</span><span>VISA</span><span>Mastercard</span><span>RuPay</span><span>Net-banking</span></div></div>' +
       cols.map(function (c) { return '<div><h4>' + c[0] + '</h4><ul>' + c[1].map(function (l) { return '<li><a href="' + l[0] + '">' + l[1] + '</a></li>'; }).join("") + '</ul></div>'; }).join("") +
       '</div><div class="foot-bottom"><span>© ' + new Date().getFullYear() + ' ' + GV.esc(C.businessName) + '. All game titles, logos and artwork are original works of ' + GV.esc(C.siteName) + '.</span><button class="linkish" id="cookie-settings">Cookie settings</button></div></div>';
     GV.$("#cookie-settings").addEventListener("click", function () { store("gv_consent", null); cookieBanner(true); });
