@@ -15,6 +15,7 @@
     var stF = $("#st-free"); if (stF) stF.textContent = Math.round(100 * playable.filter(function (g) { return !g.premium; }).length / playable.length) + "%";
     fill($("#row-trending"), playable.slice().sort(function (a, b) { return a.trending - b.trending; }).slice(0, 8));
     fill($("#row-mini6"), G.filter(function (g) { return g.pack === "mini6"; }));
+    fill($("#row-horror"), G.filter(function (g) { return g.pack === "horror5"; }));
     fill($("#row-new"), G.slice().sort(function (a, b) { return b.added < a.added ? -1 : 1; }).slice(0, 8));
     fill($("#grid-online"), playable);
     var and = $("#android-list");

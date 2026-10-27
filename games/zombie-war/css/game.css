@@ -1,0 +1,33 @@
+:root{--accent:#ff7a1a;--accent2:#9aff3a}
+#title{background:radial-gradient(ellipse at 50% 60%,rgba(0,0,0,0) 0,rgba(0,0,0,.6) 72%)}
+.logo{color:#f6efe2;text-shadow:0 0 20px #ff5a10,0 0 46px rgba(255,90,10,.5),0 5px 0 #3a1200}
+.logo small{color:#9aff3a;text-shadow:0 0 14px #5aff1a}
+.btn{border-color:rgba(255,122,26,.45)}.btn.primary{background:linear-gradient(180deg,#b44a0a,#4a1a04);border-color:#ffa05a}
+.btn:hover,.btn:focus{box-shadow:0 0 18px rgba(255,122,26,.5)}
+.toggle button.sel{background:#b44a0a;border-color:#ffa05a}
+.lv.boss{background:linear-gradient(180deg,#5a1e05,#220a02);border-color:#ff7a1a}
+.lv.night::before{content:'☾';position:absolute;top:1px;left:4px;font-size:10px;color:#9ab4ff}
+.lv small{color:#ffae6a}
+#radar{background:radial-gradient(circle,rgba(20,40,20,.6),rgba(0,0,0,.65));border:1px solid rgba(154,255,58,.35);border-radius:50%;width:150px;height:150px}
+@media (max-width:700px),(max-height:500px){#radar{width:96px;height:96px}}
+#ammoBox{position:absolute;right:22px;bottom:18px;text-align:right}
+#ammoBox .wname{font-size:13px;letter-spacing:.2em;color:#ffbf8a}
+#ammoBox .ammo b{font-size:clamp(30px,5vw,52px);font-weight:normal}
+#ammoBox .ammo span{font-size:clamp(16px,2.4vw,24px);color:#bbb;margin-left:6px}
+#ammoBox .ammo b.low{color:#ff4a3a}
+#ammoBox .nades{color:#9aff3a;font-size:16px;letter-spacing:.2em}
+@media (pointer:coarse){#ammoBox{right:auto;left:50%;transform:translateX(-50%);bottom:6px;text-align:center}#ammoBox .ammo b{font-size:30px}}
+#prompt{position:absolute;left:50%;bottom:24%;transform:translateX(-50%);text-align:center;display:none;font-size:18px}
+#prompt .bar{width:200px;height:8px;margin:6px auto 0}#promptBar{background:#9aff3a}
+#reloadHint{position:absolute;left:50%;top:58%;transform:translateX(-50%);font-size:16px;letter-spacing:.3em;color:#ffcf3a;display:none;animation:blink .6s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:.3}}
+#cross{width:26px;height:26px;margin:-13px 0 0 -13px;transition:transform .05s}
+#cross::before{left:12px;width:2px;height:26px}#cross::after{top:12px;height:2px;width:26px}
+#hitmark{position:fixed;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;pointer-events:none;z-index:11;opacity:0;background:linear-gradient(45deg,transparent 46%,#fff 46%,#fff 54%,transparent 54%),linear-gradient(-45deg,transparent 46%,#fff 46%,#fff 54%,transparent 54%);-webkit-mask:radial-gradient(circle,transparent 6px,#000 7px);mask:radial-gradient(circle,transparent 6px,#000 7px)}
+#hitmark.kill{background:linear-gradient(45deg,transparent 44%,#ff3a2a 44%,#ff3a2a 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,#ff3a2a 44%,#ff3a2a 56%,transparent 56%)}
+#popup{position:fixed;left:50%;top:41%;transform:translateX(-50%);font-family:var(--font);letter-spacing:.15em;color:#ffcf3a;text-shadow:0 0 10px #ff5a10,0 2px 3px #000;font-size:20px;z-index:11;pointer-events:none;opacity:0;transition:opacity .2s}
+#dmgdir{position:absolute;left:50%;top:50%;width:300px;height:300px;margin:-150px 0 0 -150px;opacity:0;transition:opacity .5s}
+#dmgdir i{position:absolute;left:50%;top:0;width:120px;height:40px;margin-left:-60px;border-radius:50% 50% 0 0/100% 100% 0 0;border-top:6px solid rgba(255,30,20,.9);filter:drop-shadow(0 0 6px #f00)}
+.hud-tc .big{color:#ffe2c2}
+.bossbar{top:96px;width:min(520px,50vw)}
+@media (max-width:700px),(max-height:500px){.bossbar{top:84px}}

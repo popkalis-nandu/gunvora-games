@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Zombie War: Last City – GUNVORA GAMES</title>
+<meta name="description" content="Zombie War: Last City – 250-level 3D zombie shooter by GUNVORA GAMES.">
+<link rel="icon" href="thumb.png">
+<link rel="stylesheet" href="css/core.css">
+<link rel="stylesheet" href="css/game.css">
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/":"./lib/addons/"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">GUNVORA&nbsp;GAMES</div>
+
+<section id="title" class="screen active">
+  <div class="brand"><b>GUNVORA</b> GAMES presents</div>
+  <h1 class="logo">Zombie War<small>Last City</small></h1>
+  <p class="tag">The outbreak took the city in one night. You are the last soldier still holding the streets. Hold off the horde, rescue survivors and take down the mutated Commander.</p>
+  <div class="menu">
+    <button class="btn primary" id="bPlay">Play</button>
+    <button class="btn" id="bLevels">Select Level</button>
+    <button class="btn" id="bShop">Armory</button>
+    <button class="btn" id="bSettings">Settings</button>
+    <button class="btn" id="bHow">How to Play</button>
+  </div>
+  <div class="row"><span class="coins" id="tCoins">0</span></div>
+</section>
+
+<section id="levels" class="screen dim">
+  <div class="panel">
+    <h2>Select Mission</h2>
+    <div class="brand" id="lvProg"></div>
+    <div class="grid" id="lvGrid"></div>
+    <div class="row"><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="shop" class="screen dim">
+  <div class="panel">
+    <h2>Armory</h2>
+    <div class="coins" id="shopCoins"></div>
+    <div class="hint">Coins are earned in-game from kills, headshots and completed missions. No real money.</div><br>
+    <div class="shop" id="shopList"></div>
+    <div class="row"><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="settings" class="screen dim">
+  <div class="panel">
+    <h2>Settings</h2>
+    <div class="toggle">Graphics: <button class="btn small" data-q="low">Low (fast)</button><button class="btn small" data-q="high">High</button></div>
+    <div class="toggle">Look sensitivity <input type="range" id="sSens" min="0.3" max="2.5" step="0.1"></div>
+    <div class="toggle">Volume <input type="range" id="sVol" min="0" max="1" step="0.05"></div>
+    <div class="toggle">Aim assist (touch) <button class="btn small" id="sAssist">On</button></div>
+    <div class="hint">Low = lower resolution, no shadows or bloom. Recommended for phones.</div>
+    <div class="row"><button class="btn small" id="bReset">Reset progress</button><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="howto" class="screen dim">
+  <div class="panel" style="text-align:left;max-width:680px">
+    <h2>How to Play</h2>
+    <div class="stat"><span>Move / Sprint</span><span>W A S D + Shift · joystick + RUN</span></div>
+    <div class="stat"><span>Aim</span><span>Mouse · drag the right side or the FIRE button</span></div>
+    <div class="stat"><span>Shoot / Aim down sights</span><span>Left click / Right click · FIRE</span></div>
+    <div class="stat"><span>Reload</span><span>R · RELOAD</span></div>
+    <div class="stat"><span>Grenade</span><span>G · NADE</span></div>
+    <div class="stat"><span>Switch weapon</span><span>1-4 / mouse wheel / Q · SWAP</span></div>
+    <div class="stat"><span>Rescue survivor</span><span>Hold E · hold USE</span></div>
+    <div class="stat"><span>Pause</span><span>Esc / P · ❚❚</span></div>
+    <p class="hint">Missions: survive the WAVES, HOLD OUT until the evac arrives, or RESCUE the survivors (the green beacons). Ammo is scarce, so aim for the head, watch for supply drops and shoot the red barrels to blow up whole crowds. Green bloated zombies explode: kill them from a distance. Every 3rd mission is at night. Every 10th mission the giant mutated Commander attacks. Clear all 250 to retake the city.</p>
+    <div class="row"><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="pause" class="screen dim">
+  <h2>Paused</h2>
+  <div class="menu">
+    <button class="btn primary" id="bResume">Resume</button>
+    <button class="btn" id="bRestart">Restart Mission</button>
+    <button class="btn" id="bPSettings">Settings</button>
+    <button class="btn" id="bQuit">Quit to Menu</button>
+  </div>
+</section>
+
+<section id="over" class="screen dim">
+  <h2 style="color:#ff3a3a">You Were Overrun</h2>
+  <div class="panel" id="overStats" style="min-width:300px"></div>
+  <div class="row"><button class="btn primary" id="bRetry">Retry</button><button class="btn" id="bOverShop">Armory</button><button class="btn" id="bOverMenu">Menu</button></div>
+</section>
+
+<section id="win" class="screen dim">
+  <h2 id="winTitle">Mission Complete</h2>
+  <div class="panel" id="winStats" style="min-width:300px"></div>
+  <div class="row"><button class="btn primary" id="bNext">Next Mission</button><button class="btn" id="bWinShop">Armory</button><button class="btn" id="bWinLevels">Missions</button></div>
+</section>
+
+<div id="hud">
+  <div class="hud-tl">
+    <div class="lbl">HEALTH</div><div class="bar"><i id="hpBar" style="background:linear-gradient(90deg,#8a0b0b,#ff3a2a)"></i></div>
+    <div class="bar" style="height:4px;width:min(160px,26vw)"><i id="stBar" style="background:#cfd8dc"></i></div>
+    <div class="obj" id="objective"></div>
+  </div>
+  <div class="hud-tc"><div class="lbl" id="lvlLbl"></div><div class="big" id="misLbl"></div></div>
+  <div class="bossbar" id="bossBar"><div class="lbl" id="bossName">THE MUTATED COMMANDER</div><div class="bar"><i id="bossHp"></i></div></div>
+  <div class="hud-tr">
+    <canvas id="radar" width="150" height="150"></canvas>
+    <div class="coins" id="coinHud">0</div>
+  </div>
+  <div id="ammoBox"><div class="wname" id="wName">M9 PISTOL</div><div class="ammo"><b id="aMag">12</b><span id="aRes">/ ∞</span></div><div class="nades" id="nadeHud">● ● </div></div>
+  <div id="prompt"><span id="promptTxt"></span><div class="bar"><i id="promptBar"></i></div></div>
+  <div id="reloadHint">RELOAD</div>
+  <div id="dmgdir"><i></i></div>
+</div>
+<div id="cross"></div>
+<div id="hitmark"></div>
+<div id="popup"></div>
+<div id="toast"></div>
+
+<div id="touch">
+  <div class="lookzone"></div>
+  <div class="stick"><div class="knob"></div></div>
+  <div class="tb fire" data-btn="fire" data-look="1" style="right:4vw;bottom:9vh">FIRE</div>
+  <div class="tb" data-btn="reload" style="right:calc(4vw + 108px);bottom:5vh">RELOAD</div>
+  <div class="tb" data-btn="nade" style="right:calc(4vw + 112px);bottom:calc(5vh + 78px)">NADE</div>
+  <div class="tb" data-btn="swap" style="right:calc(4vw + 16px);bottom:calc(9vh + 106px)">SWAP</div>
+  <div class="tb" data-btn="use" style="right:calc(4vw + 186px);bottom:5vh">USE</div>
+  <div class="tb" data-btn="run" style="left:calc(4vw + 160px);bottom:5vh">RUN</div>
+  <div class="tb sq" data-btn="pause" style="right:calc(150px + 26px);top:12px">❚❚</div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

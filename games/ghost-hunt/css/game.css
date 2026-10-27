@@ -1,0 +1,18 @@
+:root{--accent:#b06bff;--accent2:#7fffd4}
+#title{background:radial-gradient(ellipse at 50% 60%,rgba(0,0,0,0) 0,rgba(0,0,0,.65) 70%)}
+.logo{color:#e9f3ff;text-shadow:0 0 22px #8a4dff,0 0 50px rgba(120,60,255,.6),0 4px 0 #120024}
+.btn{border-color:rgba(176,107,255,.45)}.btn.primary{background:linear-gradient(180deg,#5b2a9e,#22093f);border-color:#c79bff}
+.btn:hover,.btn:focus{box-shadow:0 0 18px rgba(176,107,255,.5)}
+.lv.boss{background:linear-gradient(180deg,#3d0b55,#14051f);border-color:#c27bff}
+#minimap{background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.2);border-radius:6px;width:150px;height:150px}
+@media (max-width:700px),(max-height:500px){#minimap{width:104px;height:104px}}
+.emf{display:flex;gap:3px;justify-content:flex-end;align-items:center;margin:6px 0}
+.emf i{width:12px;height:12px;border-radius:2px;background:#222;border:1px solid #444}
+.emf i.on:nth-of-type(1),.emf i.on:nth-of-type(2){background:#3cff6a;box-shadow:0 0 8px #3cff6a}
+.emf i.on:nth-of-type(3){background:#ffd23c;box-shadow:0 0 8px #ffd23c}
+.emf i.on:nth-of-type(4),.emf i.on:nth-of-type(5){background:#ff3c3c;box-shadow:0 0 8px #ff3c3c}
+#prompt{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);text-align:center;display:none;font-size:18px}
+#prompt .bar{width:200px;height:8px;margin:6px auto 0}#promptBar{background:#7fffd4}
+#cross.dot{width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.7);box-shadow:0 0 4px #000}
+#cross.dot::before,#cross.dot::after{display:none}
+#note{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-2deg);max-width:min(420px,80vw);background:#e8dfc6;color:#3a2a1a;padding:18px 22px;font-family:'Courier New',monospace;font-size:15px;line-height:1.45;box-shadow:0 10px 40px #000;z-index:25;display:none;border-radius:2px;white-space:pre-line}

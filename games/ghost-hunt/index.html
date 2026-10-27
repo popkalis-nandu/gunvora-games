@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Ghost Hunt: Haunted Hospital – GUNVORA GAMES</title>
+<meta name="description" content="Ghost Hunt: Haunted Hospital – 100-level 3D ghost hunting horror game by GUNVORA GAMES.">
+<link rel="icon" href="thumb.png">
+<link rel="stylesheet" href="css/core.css">
+<link rel="stylesheet" href="css/game.css">
+<script type="importmap">{"imports":{"three":"./lib/three.module.js","three/addons/":"./lib/addons/"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">GUNVORA&nbsp;GAMES</div>
+
+<section id="title" class="screen active">
+  <div class="brand"><b>GUNVORA</b> GAMES presents</div>
+  <h1 class="logo">Ghost Hunt<small>Haunted Hospital</small></h1>
+  <p class="tag">St. Agatha's closed in 1987 after the head doctor's experiments went wrong. The patients never left. Find the keys, rescue the trapped, and burn the dead away with your UV light.</p>
+  <div class="menu">
+    <button class="btn primary" id="bPlay">Play</button>
+    <button class="btn" id="bLevels">Select Level</button>
+    <button class="btn" id="bShop">Upgrades Shop</button>
+    <button class="btn" id="bSettings">Settings</button>
+    <button class="btn" id="bHow">How to Play</button>
+  </div>
+  <div class="row"><span class="coins" id="tCoins">0</span></div>
+</section>
+
+<section id="levels" class="screen dim">
+  <div class="panel">
+    <h2>Select Level</h2>
+    <div class="brand" id="lvProg"></div>
+    <div class="grid" id="lvGrid"></div>
+    <div class="row"><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="shop" class="screen dim">
+  <div class="panel">
+    <h2>Ghost Hunter Gear</h2>
+    <div class="coins" id="shopCoins"></div>
+    <div class="hint">Coins are earned in-game by finishing levels, banishing ghosts and finding coins. No real money.</div><br>
+    <div class="shop" id="shopList"></div>
+    <div class="row"><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="settings" class="screen dim">
+  <div class="panel">
+    <h2>Settings</h2>
+    <div class="toggle">Graphics: <button class="btn small" data-q="low">Low (fast)</button><button class="btn small" data-q="high">High</button></div>
+    <div class="toggle">Look sensitivity <input type="range" id="sSens" min="0.3" max="2.5" step="0.1"></div>
+    <div class="toggle">Volume <input type="range" id="sVol" min="0" max="1" step="0.05"></div>
+    <div class="hint">Low = lower resolution, no shadows/bloom – recommended for phones.</div>
+    <div class="row"><button class="btn small" id="bReset">Reset progress</button><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="howto" class="screen dim">
+  <div class="panel" style="text-align:left;max-width:640px">
+    <h2>How to Play</h2>
+    <div class="stat"><span>Move</span><span>W A S D / left joystick</span></div>
+    <div class="stat"><span>Look</span><span>Mouse / drag right side</span></div>
+    <div class="stat"><span>UV beam (burns ghosts, drains battery)</span><span>Hold Left Click / Space / BEAM</span></div>
+    <div class="stat"><span>Use – rescue patients, pull fuse levers</span><span>Hold E / USE</span></div>
+    <div class="stat"><span>Run</span><span>Shift / RUN</span></div>
+    <div class="stat"><span>Medkit</span><span>Q / MED</span></div>
+    <div class="stat"><span>Pause</span><span>Esc / P / ❚❚</span></div>
+    <p class="hint">Collect every key, rescue the trapped patients and restore power with the fuse boxes. Then reach the glowing EXIT elevator. Watch your back – they appear behind you. Every 10th floor the possessed Head Doctor hunts you. Survive all 100 levels.</p>
+    <div class="row"><button class="btn small back">Back</button></div>
+  </div>
+</section>
+
+<section id="pause" class="screen dim">
+  <h2>Paused</h2>
+  <div class="menu">
+    <button class="btn primary" id="bResume">Resume</button>
+    <button class="btn" id="bRestart">Restart Level</button>
+    <button class="btn" id="bPSettings">Settings</button>
+    <button class="btn" id="bQuit">Quit to Menu</button>
+  </div>
+</section>
+
+<section id="over" class="screen dim">
+  <h2 style="color:#ff3a3a">You Became One of Them</h2>
+  <div class="panel" id="overStats" style="min-width:300px"></div>
+  <div class="row"><button class="btn primary" id="bRetry">Retry</button><button class="btn" id="bOverShop">Shop</button><button class="btn" id="bOverMenu">Menu</button></div>
+</section>
+
+<section id="win" class="screen dim">
+  <h2 id="winTitle">Floor Cleared</h2>
+  <div class="panel" id="winStats" style="min-width:300px"></div>
+  <div class="row"><button class="btn primary" id="bNext">Next Level</button><button class="btn" id="bWinShop">Shop</button><button class="btn" id="bWinLevels">Levels</button></div>
+</section>
+
+<div id="hud">
+  <div class="hud-tl">
+    <div class="lbl">HEALTH</div><div class="bar"><i id="hpBar" style="background:linear-gradient(90deg,#8a0b0b,#ff3a2a)"></i></div>
+    <div class="lbl">UV BATTERY</div><div class="bar"><i id="batBar" style="background:linear-gradient(90deg,#4a1a9a,#c27bff)"></i></div>
+    <div class="bar" style="height:4px;width:min(160px,26vw)"><i id="stBar" style="background:#cfd8dc"></i></div>
+    <div class="obj" id="objective"></div>
+  </div>
+  <div class="hud-tc"><div class="big" id="lvlLbl"></div></div>
+  <div class="bossbar" id="bossBar"><div class="lbl" id="bossName">THE POSSESSED HEAD DOCTOR</div><div class="bar"><i id="bossHp"></i></div></div>
+  <div class="hud-tr">
+    <canvas id="minimap" width="150" height="150"></canvas>
+    <div class="emf"><span class="lbl">EMF</span><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="coins" id="coinHud">0</div>
+  </div>
+  <div class="hud-br"><div class="big" id="medHud">✚ 0</div></div>
+  <div id="prompt"><span id="promptTxt"></span><div class="bar"><i id="promptBar"></i></div></div>
+</div>
+<div id="cross" class="dot"></div>
+<div id="toast"></div>
+<div id="note"></div>
+
+<div id="touch">
+  <div class="lookzone"></div>
+  <div class="stick"><div class="knob"></div></div>
+  <div class="tb fire" data-btn="fire" data-look="1" style="right:4vw;bottom:8vh">UV<br>BEAM</div>
+  <div class="tb" data-btn="use" style="right:calc(4vw + 104px);bottom:5vh">USE</div>
+  <div class="tb" data-btn="run" style="right:calc(4vw + 18px);bottom:calc(8vh + 104px)">RUN</div>
+  <div class="tb" data-btn="med" style="right:calc(4vw + 112px);bottom:calc(5vh + 80px)">MED</div>
+  <div class="tb sq" data-btn="pause" style="right:calc(150px + 26px);top:12px">❚❚</div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

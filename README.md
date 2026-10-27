@@ -249,3 +249,10 @@ Six original canvas games in `games/` using the shared `js/play.js` engine, regi
 `bubblekingdom.js` (Bubble Kingdom · 100 levels), `soldierstrike.js` (Mini Soldier Strike · 40 missions, 10 weapons, 5 bosses),
 `parking.js` (Parking Escape · 100 BFS-verified levels), `skytower.js` (Sky Tower Stack · endless + 30 challenges, 6 themes).
 Progress, coins and high scores are saved in localStorage (`gv_colorblast`, `gv_lanerush`, `gv_bubblekingdom`, `gv_soldierstrike`, `gv_parking`, `gv_skytower`).
+
+## Ghost & Zombie pack (added 2026-10-27, all free)
+Five full 3D horror games (three.js, bundled in each folder), embedded from `games/<slug>/` (pack `horror5`, category `horror` "Ghost & Zombie", home row "👻 Ghost & Zombie", screenshots `assets/shots/<slug>-N.jpg`):
+`ghost-hunt` (Ghost Hunt: Haunted Hospital · 100 levels), `zombie-war` (Zombie War: Last City · 250 missions),
+`ghost-village` (Ghost Village: Curse of the Night · 150 nights), `zombie-express` (Zombie Express: Death Train · 200 runs),
+`nightmare-house` (Nightmare House: Escape the Dead · 300 nights, 3 endings).
+Each has desktop and touch controls, a quality setting, bosses every 10th level and a shop. Progress is saved in localStorage (`gunvora_ghosthunt_v1`, `gunvora_zombiewar_v1`, `gunvora_ghost-village_v1`, `gunvora_zombie-express_v1`, `gunvora_nightmare_house_v1`).

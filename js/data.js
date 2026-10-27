@@ -12,7 +12,8 @@ window.GV_CATEGORIES = [
   { id: "kids",      name: "Kids",      icon: "🧸" },
   { id: "puzzles",   name: "Puzzles",   icon: "🧩" },
   { id: "arcade",    name: "Arcade",    icon: "🕹️" },
-  { id: "board",     name: "Board & Strategy", icon: "♟️" }
+  { id: "board",     name: "Board & Strategy", icon: "♟️" },
+  { id: "horror",    name: "Ghost & Zombie", icon: "🧟" }
 ];
 
 window.GV_GAMES = [
@@ -328,6 +329,58 @@ window.GV_GAMES = [
     storyline: "The grid is filling up. Rotate, slide and drop glowing blocks to clear lines before they reach the top.",
     controls: [["← →", "Move"], ["↑ / X", "Rotate"], ["↓", "Soft drop"], ["Space", "Hard drop"], ["Touch", "On-screen buttons"]],
     instructions: ["Complete a row to clear it.", "Clear several rows at once for big combos.", "Speed increases every 10 lines. Premium members only."]
+  },
+
+  /* ---------------- GHOST & ZOMBIE PACK (5) ---------------- */
+  {
+    id: "ghost-hunt", title: "Ghost Hunt: Haunted Hospital", tagline: "3D ghost-hunting horror: 100 floors of a haunted hospital.",
+    status: "playable", premium: false, kids: false, flagship: true, trending: 15, added: "2026-10-27", isNew: true, pack: "horror5",
+    embed: "games/ghost-hunt/", orientation: "landscape", shots: 3,
+    categories: ["horror", "adventure"], difficulty: "Medium", age: "12+",
+    platforms: ["Web (desktop & mobile)"],
+    storyline: "An abandoned hospital, 100 floors deep and crawling with restless spirits. Burn ghosts with your UV beam, collect every key, rescue the trapped patients and restore power at the fuse boxes, then reach the glowing exit elevator. Every 10th floor the possessed Head Doctor hunts you. Full 3D with flickering lights, fog and jump scares.",
+    controls: [["WASD", "Move"], ["Mouse", "Look (click the game to lock the mouse)"], ["Left click / Space", "UV beam (hold, burns ghosts, drains battery)"], ["E (hold)", "Rescue patients, pull fuse levers"], ["Shift", "Run"], ["Q", "Medkit"], ["Esc / P", "Pause"], ["Touch", "Joystick, drag to look, BEAM / USE / RUN / MED buttons"]],
+    instructions: ["Collect every key, rescue the trapped patients and restore power with the fuse boxes.", "Then reach the glowing EXIT elevator. Watch your back: ghosts appear behind you.", "Every 10th floor the possessed Head Doctor hunts you. Survive all 100 levels.", "Best in landscape on phones."]
+  },
+  {
+    id: "zombie-war", title: "Zombie War: Last City", tagline: "3D zombie shooter: retake the city in 250 missions.",
+    status: "playable", premium: false, kids: false, flagship: true, trending: 16, added: "2026-10-27", isNew: true, pack: "horror5",
+    embed: "games/zombie-war/", orientation: "landscape", shots: 3,
+    categories: ["horror", "shooting"], difficulty: "Hard", age: "16+",
+    platforms: ["Web (desktop & mobile)"],
+    storyline: "The city has fallen to the undead. Fight through 250 missions: survive the waves, hold out until the evac arrives, or rescue survivors at the green beacons. Ammo is scarce, so aim for the head, grab supply drops and blow up red barrels to take out whole crowds. Every 3rd mission is at night, and every 10th the giant mutated Commander attacks.",
+    controls: [["WASD", "Move"], ["Shift", "Sprint"], ["Mouse", "Aim (click the game to lock the mouse)"], ["Left click", "Shoot"], ["Right click", "Aim down sights"], ["R", "Reload"], ["G", "Grenade"], ["1–4 / wheel / Q", "Switch weapon"], ["E (hold)", "Rescue survivor"], ["Esc / P", "Pause"], ["Touch", "Joystick + RUN, FIRE, RELOAD, NADE, SWAP, USE buttons"]],
+    instructions: ["Complete the mission goal: survive the waves, hold out for evac, or rescue the survivors.", "Green bloated zombies explode, so kill them from a distance.", "Shoot red barrels to blow up crowds and watch for supply drops.", "Every 10th mission is a boss: the mutated Commander. Clear all 250 to retake the city."]
+  },
+  {
+    id: "ghost-village", title: "Ghost Village: Curse of the Night", tagline: "3D village horror: survive 150 cursed nights.",
+    status: "playable", premium: false, kids: false, flagship: true, trending: 17, added: "2026-10-27", isNew: true, pack: "horror5",
+    embed: "games/ghost-village/", orientation: "landscape", shots: 3,
+    categories: ["horror", "adventure"], difficulty: "Medium", age: "12+",
+    platforms: ["Web (desktop & mobile)"],
+    storyline: "Something follows you in the dark. Survive 150 cursed nights in a haunted village armed with a holy lantern: light the sacred diyas, banish spirits, collect amulets, seal haunted wells or survive until dawn. A pale ghost silently follows you and vanishes only when you look at her, so listen for the heartbeat and look back. Every 10th night the Spirit Queen rises.",
+    controls: [["WASD", "Move"], ["Mouse", "Look (click the game to lock the mouse)"], ["Left click", "Fire holy flame"], ["R", "Refill lamp"], ["E / F (hold)", "Interact"], ["Q / right click", "Temple bell blast"], ["Shift", "Sprint"], ["Esc / P", "Pause"], ["Touch", "Left stick, drag right side to look, fire / refill / interact / bell / sprint buttons"]],
+    instructions: ["Each night has an objective shown at the top left; complete it before dawn.", "The Follower vanishes when you turn and look at her. If you hear a heartbeat, look back!", "Use the temple bell blast when spirits surround you.", "Every 10th night is a boss: banish the Spirit Queen. Earn coins for upgrades in the Shop."]
+  },
+  {
+    id: "zombie-express", title: "Zombie Express: Death Train", tagline: "Zombie train survival in 3D: 200 runs.",
+    status: "playable", premium: false, kids: false, flagship: true, trending: 18, added: "2026-10-27", isNew: true, pack: "horror5",
+    embed: "games/zombie-express/", orientation: "landscape", shots: 3,
+    categories: ["horror", "shooting"], difficulty: "Hard", age: "16+",
+    platforms: ["Web (desktop & mobile)"],
+    storyline: "The last train out of the city. It never stops, and neither do they. Survive 200 runs aboard the infected express, from Easy to Extreme: fight coach by coach to the engine, protect trapped survivors, hold out until the next safe station, or vent the gas from infected coaches. Zombies smash through the windows, and when the power fails only your torch remains. Every 10th run the Mutated Train Driver attacks.",
+    controls: [["WASD", "Move"], ["Mouse", "Aim (click the game to lock the mouse)"], ["Left click", "Shoot"], ["R", "Reload"], ["1 / 2 / 3 or X", "Switch weapon"], ["Q / right click", "Shove"], ["E (hold)", "Use"], ["Shift", "Sprint"], ["Esc / P", "Pause"], ["Touch", "Left stick, drag right side to aim, shoot / reload / weapon / shove / use / sprint buttons"]],
+    instructions: ["Complete each run's goal: clear the coaches, protect survivors, hold out or vent the infected coaches.", "Watch the windows: zombies smash through the glass.", "Shove zombies back when they get close, and keep reloading between fights.", "Every 10th run is a boss: the Mutated Train Driver. Unlock weapons in the Shop."]
+  },
+  {
+    id: "nightmare-house", title: "Nightmare House: Escape the Dead", tagline: "3D horror escape: 300 nights in a haunted mansion.",
+    status: "playable", premium: false, kids: false, flagship: true, trending: 19, added: "2026-10-27", isNew: true, pack: "horror5",
+    embed: "games/nightmare-house/", orientation: "landscape", shots: 4,
+    categories: ["horror", "shooting", "adventure"], difficulty: "Hard", age: "16+",
+    platforms: ["Web (desktop & mobile)"],
+    storyline: "Trapped in a cursed mansion, you must survive until sunrise across 300 nights. Find clues and secret bookshelf doors, banish ghosts with the Spirit Lantern, gun down the walking dead and face the Immortal Master of the House every 10th night. Shoot his soul urns to break his shield, then beat the final boss to unlock one of 3 endings. Earn coins for 6 upgrades. Full 3D with flickering lights, shadows, fog, bloom and jump scares.",
+    controls: [["WASD", "Move"], ["Mouse", "Look (click the game to lock the mouse)"], ["Left click", "Fire revolver"], ["Q / right click", "Spirit Lantern (ghosts)"], ["E", "Use / open"], ["R", "Reload"], ["Shift", "Sprint"], ["F", "Flashlight"], ["Esc", "Pause"], ["Touch", "Joystick, look pad + on-screen buttons"]],
+    instructions: ["Collect the clues to unseal the exit door, then escape before sunrise.", "Ghosts can only be hurt by the Spirit Lantern; zombies need bullets.", "Every 10th night is a boss: destroy the soul urns first.", "Change graphics quality in the menu. Best in landscape on phones."]
   }
 ];
 
