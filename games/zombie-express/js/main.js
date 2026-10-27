@@ -24,7 +24,7 @@ const UPG = [
 ];
 const WEAP = {
   pistol: { name: 'PISTOL', dmg: 28, rate: 0.24, clip: 12, res: 72, spread: 0.012, pellets: 1, reload: 1.1, kick: 0.6, sound: 'pistol', auto: false },
-  shotgun: { name: 'SHOTGUN', dmg: 15, rate: 0.82, clip: 6, res: 30, spread: 0.075, pellets: 9, reload: 1.7, kick: 1.4, sound: 'shotgun', auto: false },
+  shotgun: { name: 'SHOTGUN', dmg: 15, rate: 0.82, clip: 6, res: 30, spread: 0.05, pellets: 9, reload: 1.7, kick: 1.4, sound: 'shotgun', auto: false },
   rifle: { name: 'ASSAULT RIFLE', dmg: 21, rate: 0.095, clip: 30, res: 150, spread: 0.022, pellets: 1, reload: 1.5, kick: 0.45, sound: 'rifle', auto: true },
 };
 const sound = new Sound();
@@ -262,7 +262,7 @@ function buildZombie(type, D) {
   for (const A of [P.aL, P.aR]) { const big = boss && A === P.aR; const k = big ? 1.9 : 1;
     part(type === 'runner' || type === 'brute' || big ? skin : shirt, aw * k, al * k, aw * k, 0, -al * k / 2, 0, A); const el = joint(A, 0, -al * k, 0); A.userData.el = el; part(skin, aw * 0.85 * k, al * k, aw * 0.85 * k, 0, -al * k / 2, 0, el); part(skin, aw * 0.9 * k, 0.1 * k, aw * k, 0, -al * k - 0.05, 0.02, el);
     if (big) { for (let i = 0; i < 6; i++) part(M.pus, 0.07, 0.07, 0.07, rr(-0.12, 0.12), -rr(0.1, 0.7), rr(-0.12, 0.12), el, G.sph); for (let i = 0; i < 4; i++) part(M.steel, 0.03, 0.18, 0.03, (i - 1.5) * 0.06, -al * k - 0.16, 0.06, el, G.cone).rotation.x = Math.PI; } }
-  g.traverse(o => { o.castShadow = true; });
+  g.traverse(o => { o.castShadow = true; }); P.head.traverse(o => { o.userData.head = true; });
   const base = { walker: { hp: 60, speed: 1.25, dmg: 9, rad: 0.32, reach: 1.05 }, runner: { hp: 38, speed: 3.6, dmg: 6, rad: 0.3, reach: 1.0 }, brute: { hp: 240, speed: 1.55, dmg: 20, rad: 0.42, reach: 1.25 }, bloater: { hp: 70, speed: 1.0, dmg: 8, rad: 0.42, reach: 1.1 }, civ: { hp: 100, speed: 0, dmg: 0, rad: 0.3, reach: 0 }, boss: { hp: 2600, speed: 1.9, dmg: 26, rad: 0.62, reach: 1.7 } }[type];
   const e = Object.assign({}, base, { type, g, P, mats, t: Math.random() * 10, atk: 0, cd: 0.5, state: 'chase', st: 0, flash: 0, stun: 0, headY: legL + torH + 0.22 * Hs, boss, civ, x: 0 });
   if (!civ) { e.hp *= D.hp; e.speed *= D.spd; e.dmg *= D.dmg; }
@@ -381,23 +381,41 @@ function wallT(o, d) {
   if (d.z < -1e-4) t = Math.min(t, (lo - 0.3 - o.z) / d.z); else if (d.z > 1e-4) t = Math.min(t, (-0.05 - o.z) / d.z);
   return Math.max(0.01, t);
 }
-const _c = new THREE.Vector3();
+const _c = new THREE.Vector3(), _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _hits = [], _right = new THREE.Vector3(), _up = new THREE.Vector3(), _base = new THREE.Vector3();
+function hitVisible(o, root) { for (let q = o; q; q = q.parent) { if (!q.visible) return false; if (q === root) return true; } return true; }
+// Hit-scan from the exact camera centre (or the cursor point if the pointer is not locked) against the zombies' visible, animated meshes.
+function castShot(o, d, far) {
+  let best = far, hitE = null, head = false; _ray.set(o, d); _ray.near = 0.05;
+  for (const e of enemies) { if (e.state === 'die') continue; const g = e.g.position, sc2 = e.g.scale.y;
+    if (raySphere(o, d, _c.set(g.x, g.y + 1.1 * sc2, g.z), 1.6 * sc2 * (e.boss ? 1.6 : 1)) < 0 && _c.distanceTo(o) > 1.6 * sc2 * (e.boss ? 1.6 : 1)) continue; // broad phase
+    e.g.updateMatrixWorld(true); _ray.far = best; _hits.length = 0; _ray.intersectObject(e.g, true, _hits);
+    for (const h of _hits) { if (!h.object.isMesh || !hitVisible(h.object, e.g)) continue; if (h.distance < best) { best = h.distance; hitE = e; head = !!h.object.userData.head; } break; } }
+  return { t: best, e: hitE, head };
+}
 function fire() {
-  const W = WEAP[S.cur], ws = S.ws[S.cur]; ws.clip--; S.fireCd = W.rate; sound.shot(W.sound); muzL.intensity = 5; S.flashT = 0.05; shake.add(W.kick * 0.12); vm.userData.kick = W.kick; player.pitch = Math.min(1.3, player.pitch + W.kick * 0.012);
+  const W = WEAP[S.cur], ws = S.ws[S.cur]; ws.clip--; S.fireCd = W.rate; sound.shot(W.sound); muzL.intensity = 5; S.flashT = 0.05; shake.add(W.kick * 0.12); vm.userData.kick = W.kick;
   flashStar.rotation.z = Math.random() * 6.28; const sc = S.cur === 'shotgun' ? 0.32 : 0.22; flashStar.scale.set(sc, sc, 1);
-  const dmgMul = 1 + U('dmg') * 0.15; rayO.copy(camera.position); const tip = GUNS[S.cur].tip.clone(); vm.localToWorld(tip);
+  const dmgMul = 1 + U('dmg') * 0.15; camera.updateMatrixWorld(); vm.updateMatrixWorld(true); const tip = GUNS[S.cur].tip.clone(); vm.localToWorld(tip);
+  _ray.setFromCamera(_ndc.set(input.aim.x, input.aim.y), camera); rayO.copy(_ray.ray.origin); _base.copy(_ray.ray.direction);
+  _right.setFromMatrixColumn(camera.matrixWorld, 0).normalize(); _up.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+  // accuracy: first shot (or after a short pause) is pinpoint; sustained auto-fire blooms slightly
+  const since = S.t - (S.lastShotT === undefined ? -9 : S.lastShotT); S.bloom = since > W.rate * 2.2 ? 0 : Math.min(1, (S.bloom || 0) + 0.2); S.lastShotT = S.t;
+  const shots = [];
   for (let p = 0; p < W.pellets; p++) {
-    camForward(rayD); rayD.x += (Math.random() - 0.5) * W.spread * 2; rayD.y += (Math.random() - 0.5) * W.spread * 2; rayD.z += (Math.random() - 0.5) * W.spread * 2; rayD.normalize();
-    let best = wallT(rayO, rayD), hitE = null, head = false;
-    for (const e of enemies) { if (e.state === 'die') continue; const g = e.g.position, sc2 = e.g.scale.y;
-      const th = raySphere(rayO, rayD, _c.set(g.x, g.y + e.headY * sc2, g.z), 0.17 * sc2 * (e.boss ? 1.4 : 1)); if (th > 0 && th < best) { best = th; hitE = e; head = true; }
-      for (const hy of [0.45, 0.85, 1.2]) { const tb = raySphere(rayO, rayD, _c.set(g.x, g.y + hy * e.headY / 1.55 * sc2, g.z), e.rad * sc2 * (e.boss ? 1.25 : 1)); if (tb > 0 && tb < best) { best = tb; hitE = e; head = false; } } }
-    const hp = tmpV.copy(rayO).addScaledVector(rayD, best);
-    if (p < 2) for (let k = 0; k < 3; k++) { const s = 1.2 + k * 2.2; if (s < best) fxA.spawn(rayO.x + rayD.x * s, rayO.y + rayD.y * s - 0.06, rayO.z + rayD.z * s, rayD.x * 90, rayD.y * 90, rayD.z * 90, 1, 0.8, 0.4, 0.9, 0.03, 0.05, 0, 0); }
+    let r = 0, an = 0;
+    if (W.pellets > 1) { if (p > 0) { an = (p - 1) / (W.pellets - 1) * Math.PI * 2 + rr(-0.25, 0.25); r = W.spread * (p % 2 ? 0.55 : 1) * rr(0.85, 1.05); } }
+    else if (S.bloom > 0) { an = Math.random() * Math.PI * 2; r = W.spread * S.bloom * Math.sqrt(Math.random()); }
+    rayD.copy(_base).addScaledVector(_right, Math.cos(an) * r).addScaledVector(_up, Math.sin(an) * r).normalize();
+    const res = castShot(rayO, rayD, wallT(rayO, rayD)); const best = res.t, hitE = res.e, head = res.head;
+    const hp = tmpV.copy(rayO).addScaledVector(rayD, best); shots.push({ x: hp.x, y: hp.y, z: hp.z, hit: hitE ? hitE.type : null, head, dist: best });
+    if (p < 3) { const L = tmpV2.copy(hp).sub(tip); const len = L.length(); L.divideScalar(len || 1); for (let k = 0; k < 3; k++) { const f = 0.12 + k * 0.28; if (f * len > 0.4) fxA.spawn(tip.x + L.x * len * f, tip.y + L.y * len * f, tip.z + L.z * len * f, L.x * 70, L.y * 70, L.z * 70, 1, 0.8, 0.4, 0.9, 0.03, Math.min(0.05, len * (1 - f) / 70), 0, 0); } }
+    fxA.spawn(hp.x - rayD.x * 0.03, hp.y - rayD.y * 0.03, hp.z - rayD.z * 0.03, 0, 0, 0, 1, 0.85, 0.5, 1, hitE ? 0.07 : 0.09, 0.09, 0, 0); // impact flash exactly on the aim point
     if (hitE) hurtZombie(hitE, W.dmg * dmgMul * (head ? 2.2 : 1), hp, rayD, head);
     else { for (let k = 0; k < 7; k++) fxA.spawn(hp.x, hp.y, hp.z, -rayD.x * rr(1, 3) + rr(-1.5, 1.5), rr(0, 2.5), -rayD.z * rr(1, 3) + rr(-1.5, 1.5), 1, rr(0.5, 0.8), 0.2, 1, 0.035, rr(0.2, 0.45), 9, 0.5);
       fxN.spawn(hp.x, hp.y, hp.z, -rayD.x * 0.4, 0.2, -rayD.z * 0.4, 0.4, 0.38, 0.36, 0.5, 0.12, 0.6, 0, 1, 1.5); }
   }
+  S.lastShot = { shots, origin: { x: rayO.x, y: rayO.y, z: rayO.z }, aim: { x: input.aim.x, y: input.aim.y } };
+  player.pitch = Math.min(1.3, player.pitch + W.kick * 0.012); // recoil after the shot, never before it
   fxA.burst(tip, 6, { color: [[1, 0.7, 0.3]], spread: 1.5, size: 0.05, life: 0.12, grav: 0 });
   if (Math.random() < 0.6) fxN.spawn(tip.x + 0.05, tip.y, tip.z, rr(1, 2), rr(1, 2), 0, 0.8, 0.6, 0.2, 1, 0.025, 0.6, 9, 0.5);
 }
@@ -477,6 +495,7 @@ function update(dt) {
   const hv = Math.hypot(player.vel.x, player.vel.z); player.bob += hv * dt * 2.1;
   player.pos.y = 1.65 + Math.sin(player.bob * 2) * 0.04 * Math.min(1, hv / 3) + (S.dead ? -1.2 : 0);
   // weapons
+  const firePressed = input.wasPressed('fire'); // a quick click/tap between frames still fires
   S.fireCd -= dt; S.shoveCd -= dt; S.swapT -= dt; const ws = S.ws[S.cur], W = WEAP[S.cur];
   const owned = Object.keys(WEAP).filter(k => S.ws[k].own);
   let want = null; if (input.wasPressed('w1')) want = 'pistol'; if (input.wasPressed('w2')) want = 'shotgun'; if (input.wasPressed('w3')) want = 'rifle'; if (input.wasPressed('weapon')) want = owned[(owned.indexOf(S.cur) + 1) % owned.length];
@@ -484,7 +503,7 @@ function update(dt) {
   if (S.reloadT > 0) { S.reloadT -= dt; if (S.reloadT <= 0) { const n = Math.min(ws.max - ws.clip, ws.res); ws.clip += n; ws.res -= n; } }
   else if (!S.done && S.swapT <= 0) {
     if ((input.wasPressed('reload') || (ws.clip === 0 && input.isDown('fire'))) && ws.clip < ws.max && ws.res > 0) { S.reloadT = W.reload * Math.pow(0.88, U('reload')); sound.reload(); }
-    else if (input.isDown('fire') && S.fireCd <= 0) { if (ws.clip > 0) fire(); else { sound.click(); S.fireCd = 0.3; if (ws.res <= 0) ui.msg('', 'Out of ammo — switch weapon or find ammo boxes!', 1.5); } }
+    else if ((input.isDown('fire') || firePressed) && S.fireCd <= 0) { if (ws.clip > 0) fire(); else { sound.click(); S.fireCd = 0.3; if (ws.res <= 0) ui.msg('', 'Out of ammo — switch weapon or find ammo boxes!', 1.5); } }
   }
   if (input.wasPressed('special') && S.shoveCd <= 0 && !S.done) shove();
   muzL.intensity = Math.max(0, muzL.intensity - dt * 60); S.flashT = (S.flashT || 0) - dt; flashSp.visible = flashStar.visible = S.flashT > 0;
@@ -601,6 +620,7 @@ function setupMenu() {
 }
 // ---------- loop ----------
 let lastT = performance.now(), fpsAcc = 0, fpsN = 0, menuT = 0;
+let crossEl = null, crossK = '';
 function frame(now) {
   requestAnimationFrame(frame);
   const rdt = Math.max(0, (now - lastT) / 1000), dt = Math.min(MAXDT, rdt); lastT = now;
@@ -636,11 +656,12 @@ function frame(now) {
   if (S && S.boomT > 0) { S.boomT -= dt; bossL.intensity = 30 * S.boomT / 0.35; } else if (!(S && S.obj === 'boss' && state === 'play' && !S.done)) bossL.intensity = 0;
   scene.fog.color.setHex(S && S.gas ? 0x0c1a06 : 0x070a12); scene.fog.density = S && S.gas ? 0.06 : 0.032;
   if (state !== 'paused') { fxA.update(dt); fxN.update(dt); }
+  { const cr = crossEl || (crossEl = document.querySelector('.h-cross')); if (cr) { const k = (input.aim.x * 50).toFixed(2) + ',' + (input.aim.y * 50).toFixed(2); if (k !== crossK) { crossK = k; cr.style.left = (50 + input.aim.x * 50) + '%'; cr.style.top = (50 - input.aim.y * 50) + '%'; } } }
   if (post.grade) { const f = state === 'play' ? player.hp / player.maxHp : 1; post.grade.uDesat.value = f < 0.35 ? 0.55 : 0.12; post.grade.uAb.value = 0.0012 + shake.amp * 0.01; post.grade.uTint.value.set(S && S.gas ? 0.85 : 1, S && S.gas ? 1.08 : 1, S && S.gas ? 0.8 : 1); }
   post.render(now / 1000);
   if (ui.save.s.fps) { fpsAcc += rdt; fpsN++; if (fpsAcc > 0.5) { ui.set('.h-fps', Math.round(fpsN / fpsAcc) + ' FPS'); fpsAcc = 0; fpsN = 0; } } else ui.set('.h-fps', '');
 }
-window.__game = { get state() { return state; }, get S() { return S; }, player, enemies, survivors, startLevel, win, ui, spawnZombie, camera, renderer, faceScare, doors };
+window.__game = { fire, castShot, input, shake, get state() { return state; }, get S() { return S; }, player, enemies, survivors, startLevel, win, ui, spawnZombie, camera, renderer, faceScare, doors };
 applyQuality();
 setupMenu();
 requestAnimationFrame(frame);

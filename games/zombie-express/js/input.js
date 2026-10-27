@@ -4,7 +4,7 @@ const KEYMAP = { KeyR: 'reload', KeyE: 'action', KeyF: 'action', KeyQ: 'special'
 export class Input {
   constructor(canvas, touchRoot) {
     this.canvas = canvas; this.keys = new Set(); this.down = new Set(); this.pressed = new Set();
-    this.lookX = 0; this.lookY = 0; this.joy = { x: 0, y: 0 }; this.sens = 1; this.enabled = false; this.locked = false; this.onUnlock = null; this.sprintToggle = false;
+    this.aim = { x: 0, y: 0 }; this.lookX = 0; this.lookY = 0; this.joy = { x: 0, y: 0 }; this.sens = 1; this.enabled = false; this.locked = false; this.onUnlock = null; this.sprintToggle = false;
     addEventListener('keydown', e => {
       if (e.repeat) return; this.keys.add(e.code); const a = KEYMAP[e.code]; if (a) { this.pressed.add(a); this.down.add(a); }
       if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code) && this.enabled) e.preventDefault();
@@ -13,18 +13,22 @@ export class Input {
     addEventListener('blur', () => { this.keys.clear(); this.down.clear(); });
     canvas.addEventListener('mousedown', e => {
       if (IS_TOUCH || !this.enabled) return;
+      if (!this.locked) this._aimAt(e);
       if (!this.locked && canvas.requestPointerLock) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) {} }
-      if (e.button === 0) this.down.add('fire'); if (e.button === 2) this.pressed.add('special');
+      if (e.button === 0) { this.down.add('fire'); this.pressed.add('fire'); } if (e.button === 2) this.pressed.add('special');
     });
     addEventListener('mouseup', e => { if (e.button === 0) this.down.delete('fire'); });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
-    addEventListener('mousemove', e => { if (this.locked && this.enabled) { this.lookX += e.movementX * 0.0022 * this.sens; this.lookY += e.movementY * 0.0022 * this.sens; } });
+    addEventListener('mousemove', e => { if (!this.locked && !IS_TOUCH) this._aimAt(e); if (this.locked && this.enabled) { this.lookX += e.movementX * 0.0022 * this.sens; this.lookY += e.movementY * 0.0022 * this.sens; } });
     document.addEventListener('pointerlockchange', () => {
-      const was = this.locked; this.locked = document.pointerLockElement === canvas;
+      const was = this.locked; this.locked = document.pointerLockElement === canvas; if (this.locked) { this.aim.x = 0; this.aim.y = 0; }
       if (was && !this.locked && this.onUnlock) this.onUnlock();
     });
     if (touchRoot) this._buildTouch(touchRoot);
   }
+  // While the pointer is NOT locked (lock pending/denied, e.g. inside an iframe or right after Esc) shots go exactly
+  // through the visible mouse cursor instead of the screen centre; once locked, aim is the exact centre (0,0).
+  _aimAt(e) { const r = this.canvas.getBoundingClientRect(); if (!r.width) return; this.aim.x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1)); this.aim.y = Math.max(-1, Math.min(1, -(((e.clientY - r.top) / r.height) * 2 - 1))); }
   _buildTouch(root) {
     root.innerHTML = `<div class="t-joyzone"><div class="t-joy"><div class="t-knob"></div></div></div><div class="t-lookzone"></div>
       <div class="t-btn t-fire" data-a="fire">🔥</div><div class="t-btn t-reload" data-a="reload">⟳</div><div class="t-btn t-action" data-a="action">✋</div>
@@ -42,7 +46,7 @@ export class Input {
     const lend = e => looks.delete(e.pointerId); lz.addEventListener('pointerup', lend); lz.addEventListener('pointercancel', lend);
     root.querySelectorAll('.t-btn').forEach(b => {
       const a = b.dataset.a; let bid = null, last = null;
-      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); bid = e.pointerId; b.setPointerCapture(bid); b.classList.add('on'); last = [e.clientX, e.clientY];
+      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); bid = e.pointerId; try { b.setPointerCapture(bid); } catch (err) {} b.classList.add('on'); last = [e.clientX, e.clientY];
         if (a === 'sprint') { this.sprintToggle = !this.sprintToggle; b.classList.toggle('lock', this.sprintToggle); } else { this.down.add(a); this.pressed.add(a); } });
       // fire button also allows looking while dragging
       b.addEventListener('pointermove', e => { if (e.pointerId !== bid || a !== 'fire' || !last) return; this.lookX += (e.clientX - last[0]) * 0.006 * this.sens; this.lookY += (e.clientY - last[1]) * 0.006 * this.sens; last = [e.clientX, e.clientY]; });
