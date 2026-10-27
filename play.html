@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Play | GUNVORA GAMES</title>
+<meta name="description" content="Play GUNVORA games online, free in your browser on mobile and desktop.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://popkalis-nandu.github.io/gunvora-games/play.html">
+<meta name="theme-color" content="#04050a">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="GUNVORA GAMES">
+<meta property="og:title" content="Play | GUNVORA GAMES">
+<meta property="og:description" content="Play GUNVORA games online, free in your browser on mobile and desktop.">
+<meta property="og:url" content="https://popkalis-nandu.github.io/gunvora-games/play.html">
+<meta property="og:image" content="https://popkalis-nandu.github.io/gunvora-games/assets/og-image.png">
+<meta property="og:locale" content="en_IN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Play | GUNVORA GAMES">
+<meta name="twitter:description" content="Play GUNVORA games online, free in your browser on mobile and desktop.">
+<meta name="twitter:image" content="https://popkalis-nandu.github.io/gunvora-games/assets/og-image.png">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="site-header"></header>
+<main id="main" class="wrap">
+<div class="play-wrap">
+  <div class="play-top"><div><h1 id="play-title">Loading…</h1><div class="card-badges" id="play-badges" style="position:static;margin-top:6px"></div></div>
+    <div class="actions"><a class="btn ghost sm" id="play-info" href="games.html">ℹ Game info</a><a class="btn ghost sm" href="games.html">More games</a></div></div>
+  <div class="stage" id="stage">
+    <canvas id="game" tabindex="0" aria-label="Game canvas"></canvas>
+    <div class="hud"><span>Score <span id="hud-score">0</span> · Best <span id="hud-best">0</span></span>
+      <span class="hb"><button id="btn-mute" aria-label="Toggle sound">🔊</button><button id="btn-pause" aria-label="Pause">⏸</button><button id="btn-full" aria-label="Fullscreen">⛶</button></span></div>
+    <div class="touch" id="touch"></div>
+    <div class="overlay" id="overlay"><h2 id="ov-title">Loading game…</h2><div class="big" id="ov-score" hidden>0</div><p id="ov-text" class="muted" style="max-width:440px"></p><button class="btn" id="ov-start" disabled>Loading…</button><p class="small muted">P / Esc = pause</p></div>
+  </div>
+  <div class="ad-slot" aria-label="Advertisement"></div>
+</div>
+</main>
+<footer id="site-footer"></footer>
+<noscript><div class="wrap notice warn" style="margin:20px auto">Please enable JavaScript to play games on GUNVORA GAMES.</div></noscript>
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/covers.js"></script>
+<script src="js/app.js"></script>
+<script src="js/play.js"></script>
+</body>
+</html>

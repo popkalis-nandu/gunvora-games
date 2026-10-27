@@ -1,0 +1,5 @@
+# GUNVORA GAMES — replace example.com with your domain
+User-agent: *
+Allow: /
+Disallow: /redeem.html
+Sitemap: https://popkalis-nandu.github.io/gunvora-games/sitemap.xml
