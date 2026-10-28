@@ -66,7 +66,8 @@ export async function boot(I, onProgress) {
   const G = {};
   const modelJobs = MODELS.map((m) => gltf.loadAsync('assets/models/' + m + '.glb').then((g) => { G[m] = g; }));
   const hdrJob = hdr.loadAsync('assets/hdri/factory_yard_1k.hdr');
-  const [envTex] = await Promise.all([hdrJob, ...texJobs, ...modelJobs]);
+  const pbJob = import('./scene3d-products.js');
+  const [envTex, PBMOD] = await Promise.all([hdrJob, pbJob, ...texJobs, ...modelJobs]);
 
   /* ---------- scene, lights, environment ---------- */
   const scene = new THREE.Scene();
@@ -222,12 +223,26 @@ export async function boot(I, onProgress) {
     PROD.bucket = g; void body;
   }
   const productScale = { toy: 1.35, chair: 0.75, bucket: 0.85 };
-  function product(p) { const g = PROD[p].clone(); g.scale.setScalar(productScale[p]); return g; }
+  const SIZECLS = { s: [0.42, 0.28, 0.34], m: [0.46, 0.5, 0.42], l: [0.56, 0.5, 0.46], xl: [0.7, 0.56, 0.46] };
+  const PTARGET = { s: 0.36, m: 0.5, l: 0.62, xl: 0.75 };
+  const sizeOf = (p) => ((I.D.products[p] || {}).size || 'm');
+  const PB = PBMOD.builders({ THREE, mesh, bx, cy, std, MAT, T, canvasTex });
+  function product(p) {
+    if (!PROD[p]) {
+      const g = PB[p] ? PB[p]() : new THREE.Group();
+      if (!PB[p]) mesh(bx(0.3, 0.3, 0.3, 0.03), MAT.paintGrey, 0, 0.15, 0, g);
+      g.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+      const b = new THREE.Box3().setFromObject(g), sz = new THREE.Vector3(); b.getSize(sz);
+      productScale[p] = PTARGET[sizeOf(p)] / Math.max(0.05, sz.x, sz.y, sz.z); PROD[p] = g;
+    }
+    const g = PROD[p].clone(); g.scale.setScalar(productScale[p]); return g;
+  }
 
   // cardboard box (Poly Haven model) for packed goods
   const BOX = firstMesh('box', [1, 1, 1]);
   const BOXSIZE = { toy: [0.42, 0.28, 0.34], chair: [0.46, 0.56, 0.42], bucket: [0.44, 0.4, 0.44] };
-  function cardBox(p) { const m = new THREE.Mesh(BOX.geo, BOX.mat); const s = BOXSIZE[p || 'toy']; m.scale.set(s[0], s[1], s[2]); m.castShadow = true; m.receiveShadow = true; return m; }
+  function boxSize(p) { return BOXSIZE[p] || SIZECLS[sizeOf(p)]; }
+  function cardBox(p) { const m = new THREE.Mesh(BOX.geo, BOX.mat); const s = boxSize(p || 'toy'); m.scale.set(s[0], s[1], s[2]); m.castShadow = true; m.receiveShadow = true; return m; }
 
   // euro pallet: deck boards on three stringers + blocks (merged, one draw call)
   const palletGeo = (() => {
@@ -316,8 +331,24 @@ export async function boot(I, onProgress) {
   const SPACES = [
     { x0: -9.5, x1: 9.7, z0: -5.7, z1: 0.35, h: 3.3 },
     { x0: -9.5, x1: 9.7, z0: -5.7, z1: 4.75, h: 4.8 },
-    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 7.2 }
+    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 7.2 },
+    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 7.6 },
+    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 7.6 },
+    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 8.0 },
+    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 8.0 },
+    { x0: -11.3, x1: 11.3, z0: -6.9, z1: 5.3, h: 8.4 }
   ];
+  // building styles for the factory-sized sites (index = space)
+  const STY = {
+    2: { clad: 0xdfe3e6, col: 0x1d4d8c, t1: 'GUNVORA', t2: 'FACTORY KINGDOM · PLANT 01', bg: '#1e1b4b', stripe: '#f97316' },
+    3: { clad: 0xb8c4cf, col: 0x2b3036, t1: 'GUNVORA', t2: 'LARGE FACTORY · PLANT 02', bg: '#0f172a', stripe: '#f59e0b' },
+    4: { clad: 0xe8ece9, col: 0x0f766e, t1: 'GUNVORA PRINT & PACK', t2: 'PRINTING · PACKAGING · PLANT 03', bg: '#134e4a', stripe: '#facc15' },
+    5: { clad: 0x9fb2c8, col: 0x1e3a8a, t1: 'GUNVORA EXPORT', t2: 'EXPORT PLANT · RAIL · SEA · AIR', bg: '#0c4a6e', stripe: '#fbbf24' },
+    6: { clad: 0xf1f3f5, col: 0x334155, t1: 'GUNVORA SMART', t2: 'SMART FACTORY · ROBOTICS · IoT', bg: '#111827', stripe: '#22d3ee' },
+    7: { clad: 0x4b5563, col: 0x111827, t1: 'GUNVORA GLOBAL', t2: 'GIGAFACTORY · GLOBAL HQ', bg: '#0b1220', stripe: '#db2777' }
+  };
+  const cladMats = {};
+  function cladMat(sp) { if (sp <= 2) return MAT.clad; if (!cladMats[sp]) { const m = MAT.clad.clone(); m.color.setHex(STY[sp].clad); cladMats[sp] = m; } return cladMats[sp]; }
   let buildingGroup = null, builtSpace = -1;
   function signboard(text1, text2, w, h, o = {}) {
     const t = signTex([{ t: text1, s: o.s1 || 54, y: 0.42, c: o.c1 || '#ffffff' }, { t: text2, s: o.s2 || 22, y: 0.8, c: o.c2 || '#f59e0b', w: 700 }], { w: 1024, h: Math.round(1024 * h / w), bg: o.bg || '#1f2a37', stripe: o.stripe });
@@ -329,8 +360,8 @@ export async function boot(I, onProgress) {
     smokeEmitters = smokeEmitters.filter((e) => e.kind !== 'chimney');
     const W = B.x1 - B.x0, D = B.z1 - B.z0, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, t = 0.25;
     // floor slab
-    mesh(boxW(W + 0.5, 0.22, D + 0.5, sp === 2 ? 5 : 3.5), MAT.floor[sp], cx, -0.1, cz, g, false, true);
-    const wallMat = sp === 0 ? MAT.plank : sp === 1 ? MAT.brick : MAT.clad, wscale = sp === 0 ? 2.4 : sp === 1 ? 2.2 : 2.6;
+    mesh(boxW(W + 0.5, 0.22, D + 0.5, sp >= 2 ? 5 : 3.5), MAT.floor[Math.min(sp, 2)], cx, -0.1, cz, g, false, true);
+    const wallMat = sp === 0 ? MAT.plank : sp === 1 ? MAT.brick : cladMat(sp), wscale = sp === 0 ? 2.4 : sp === 1 ? 2.2 : 2.6;
     const kneeH = sp === 0 ? 0.55 : 0.9;
     // back + left walls full height (camera looks in from front-right: those walls are cut away)
     mesh(boxW(W + t * 2, B.h, t, wscale), wallMat, cx, B.h / 2, B.z0 - t / 2, g);
@@ -343,7 +374,7 @@ export async function boot(I, onProgress) {
     mesh(boxW(0.3, kneeH, t, wscale), wallMat, B.x0 - t + 0.15, kneeH / 2, B.z1 + t / 2, g);
     { const gl = mesh(new THREE.PlaneGeometry(gin - B.x0 - 0.3, 0.2), MAT.hazard, (gin + B.x0 + 0.3) / 2, 0.007, B.z1 + 0.05, g, false, true); gl.rotation.x = -Math.PI / 2; }
     // corner/frame columns
-    const colMat = sp === 0 ? std(0x6b4f35, 0.8, 0, { map: T.wood_diff }) : sp === 1 ? MAT.paintDark : MAT.paintBlue;
+    const colMat = sp === 0 ? std(0x6b4f35, 0.8, 0, { map: T.wood_diff }) : sp === 1 ? MAT.paintDark : sp === 2 ? MAT.paintBlue : std(STY[sp].col, 0.45, 0.4);
     const colSz = sp === 0 ? 0.16 : 0.24;
     const cols = [[B.x1 + t / 2, B.z1 + t / 2], [B.x0 - t / 2, B.z1 + t / 2], [B.x1 + t / 2, B.z0 - t / 2], [doorX0, B.z1 + t / 2], [gin, B.z1 + t / 2]];
     cols.forEach(([x, z]) => mesh(bx(colSz + 0.06, sp === 0 ? B.h : B.h, colSz + 0.06), colMat, x, B.h / 2, z, g));
@@ -354,7 +385,7 @@ export async function boot(I, onProgress) {
     mesh(boxW(0.45, 0.08, D + t, 2), capMat, B.x1 + t / 2, kneeH + 0.04, cz, g);
     mesh(boxW(frontL, 0.08, 0.45, 2), capMat, gin + frontL / 2, kneeH + 0.04, B.z1 + t / 2, g);
     // interior columns along the back wall
-    const step = sp === 2 ? 4.5 : 4.2;
+    const step = sp >= 2 ? 4.5 : 4.2;
     for (let x = B.x0 + step; x < B.x1 - 1; x += step) {
       if (sp === 0) mesh(bx(0.14, B.h, 0.14), colMat, x, B.h / 2, B.z0 + 0.07, g);
       else { const c = new THREE.Group(); c.position.set(x, 0, B.z0 + 0.15); g.add(c); mesh(bx(0.3, B.h, 0.03), colMat, 0, B.h / 2, 0.12, c); mesh(bx(0.03, B.h, 0.26), colMat, 0, B.h / 2, 0, c); mesh(bx(0.3, B.h, 0.03), colMat, 0, B.h / 2, -0.12, c); }
@@ -374,12 +405,12 @@ export async function boot(I, onProgress) {
     // branded sign
     const sign = sp === 0 ? signboard('RENTED SHED', 'GUNVORA · FACTORY KINGDOM', 3.2, 0.62, { s1: 70, s2: 34, bg: '#2a2017', c2: '#e2b04a' })
       : sp === 1 ? signboard('GUNVORA WORKSHOP', 'FACTORY KINGDOM · EST. 2026', 4.2, 0.8, { s1: 76, s2: 34, bg: '#14213d', stripe: '#e56f17' })
-      : signboard('GUNVORA', 'FACTORY KINGDOM · PLANT 01', 6.2, 1.1, { s1: 120, s2: 40, bg: '#1e1b4b', stripe: '#f97316', glow: true });
-    sign.position.set(sp === 2 ? -0.6 : -2.0, sp === 0 ? 2.75 : sp === 1 ? 4.0 : 6.6, B.z0 + 0.03); g.add(sign);
+      : signboard(STY[sp].t1, STY[sp].t2, 6.2, 1.1, { s1: STY[sp].t1.length > 10 ? 96 : 120, s2: 40, bg: STY[sp].bg, stripe: STY[sp].stripe, glow: true });
+    sign.position.set(sp >= 2 ? -0.6 : -2.0, sp === 0 ? 2.75 : sp === 1 ? 4.0 : B.h - 0.6, B.z0 + 0.03); g.add(sign);
     // wall lamps / high-bay lights
     const lampXs = sp === 0 ? [-3.5, 5.5] : sp === 1 ? [-5.4, -1.2, 3.0, 7.2] : [-6.8, -2.3, 2.2, 6.7];
     lampXs.forEach((x) => {
-      const l = prep('lamp', { height: sp === 2 ? 1.0 : 0.75 }); const b = new THREE.Box3().setFromObject(l);
+      const l = prep('lamp', { height: sp >= 2 ? 1.0 : 0.75 }); const b = new THREE.Box3().setFromObject(l);
       l.position.set(x, B.h - 0.25 - b.max.y, B.z0 + 0.95); g.add(l);
       mesh(bx(0.06, 0.06, 0.95), MAT.darkSteel, x, B.h - 0.25, B.z0 + 0.48, g);
       l.traverse((c) => { if (c.isMesh) c.castShadow = false; });
@@ -389,9 +420,9 @@ export async function boot(I, onProgress) {
     const ext = prep('extinguisher', { height: 0.62, ground: true }); ext.position.set(B.x0 + 0.35, 0.3, B.z0 + 1.0); g.add(ext);
     const pb = prep('power_box', { height: 0.5 }); pb.position.set(B.x0 + 0.08, 1.5, B.z0 + 2.2); pb.rotation.y = Math.PI / 2; g.add(pb);
     if (sp >= 1) {
-      const sh = prep('shutter', { length: sp === 2 ? 4.2 : 3.0, ground: true }); sh.position.set(sp === 2 ? 3.2 : 3.0, 0, B.z0 + 0.02); g.add(sh);
+      const sh = prep('shutter', { length: sp === 2 ? 4.2 : 3.0, ground: true }); sh.position.set(sp === 2 ? 3.2 : sp >= 3 ? 4.0 : 3.0, 0, B.z0 + 0.02); g.add(sh);
       const tc = prep('tool_chest', { height: 0.95, ground: true }); tc.position.set(B.x0 + 0.5, 0, -0.2); tc.rotation.y = Math.PI / 2; g.add(tc);
-      const wc = prep('welding_cart', { height: 1.1, ground: true }); wc.position.set(-1.9, 0, B.z0 + 0.9); g.add(wc);
+      if (sp <= 2) { const wc = prep('welding_cart', { height: 1.1, ground: true }); wc.position.set(-1.9, 0, B.z0 + 0.9); g.add(wc); }
     }
     if (sp === 0) { const ht = prep('hand_truck', { height: 1.2, ground: true }); ht.position.set(-1.8, 0, B.z0 + 0.5); ht.rotation.y = 0.4; g.add(ht); }
     // floor markings: walkway lines and the dock threshold
@@ -405,7 +436,7 @@ export async function boot(I, onProgress) {
     // dock apron between building and road
     mesh(boxW(B.x1 - doorX0 + 0.6, 0.06, 5.25 - B.z1, 3), MAT.concrete, (B.x1 + doorX0) / 2, 0.0, (B.z1 + 5.4) / 2 + 0.1, g, false, true);
     // overhead crane + steel chimney + skylight band for the factory
-    if (sp === 2) {
+    if (sp >= 2) {
       const cr = prep('crane', { length: D - 0.4 }); const cb = new THREE.Box3().setFromObject(cr);
       cr.rotation.y = Math.PI / 2; cr.position.set(B.x0 + 2.6, B.h - 0.4 - cb.max.y, cz); g.add(cr);
       cr.traverse((c) => { if (c.isMesh) c.castShadow = false; });
@@ -434,6 +465,25 @@ export async function boot(I, onProgress) {
       const sb = signboard('PLANNED WORKSHOP', 'EXPANSION · UNLOCKS AT LEVEL 4', 2.6, 0.9, { s1: 92, s2: 44, bg: '#f4f4f0', c1: '#1f2937', c2: '#c2410c' });
       sb.position.set(-2.6, 1.55, 4.6); plot.add(sb); mesh(bx(0.06, 1.6, 0.06), MAT.galv, -3.7, 0.8, 4.57, plot); mesh(bx(0.06, 1.6, 0.06), MAT.galv, -1.5, 0.8, 4.57, plot);
     }
+    // cut-away roof: a strip over the back of the building with trusses (the rest is open so you can see in)
+    if (sp >= 1) {
+      const rd = 1.7, rz = B.z0 - 0.15 + rd / 2, ry = B.h + 0.42;
+      const roofMat = sp === 1 ? MAT.corr : sp >= 2 ? std(sp >= 6 ? 0x3b4250 : 0x8d969e, 0.5, 0.6) : MAT.corr;
+      mesh(boxW(W + 0.8, 0.08, rd, 2), roofMat, cx, ry, rz, g);
+      mesh(bx(W + 0.8, 0.16, 0.12), sp >= 6 ? std(0x22d3ee, 0.4, 0.2, { emissive: 0x22d3ee, emissiveIntensity: 0.9 }) : MAT.paintOrange, cx, ry - 0.02, rz + rd / 2, g);
+      for (let x = B.x0 + 0.4; x <= B.x1 - 0.3; x += sp >= 2 ? 4.5 : 4.2) {
+        const tr = new THREE.Group(); tr.position.set(x, B.h, B.z0); g.add(tr);
+        mesh(bx(0.08, 0.08, rd + 0.3), colMat, 0, 0.0, rd / 2, tr); mesh(bx(0.08, 0.08, rd + 0.3), colMat, 0, 0.36, rd / 2, tr);
+        for (let k = 0; k < 3; k++) { const d = mesh(bx(0.05, 0.5, 0.05), colMat, 0, 0.18, 0.2 + k * 0.6, tr); d.rotation.x = k % 2 ? 0.7 : -0.7; }
+      }
+      if (sp >= 3) for (let x = B.x0 + 2.2; x < B.x1 - 1.5; x += 4.5) mesh(bx(1.6, 0.04, 0.9), std(0xdff3ff, 0.1, 0, { emissive: 0xdff3ff, emissiveIntensity: 0.35 }), x, ry + 0.06, rz, g, false, false);
+    }
+    if (sp >= 5) { mesh(bx(W - 0.6, 0.9, 0.05), MAT.winGlass, cx, B.h - 0.85, B.z0 + 0.02, g, false, false); mesh(bx(W - 0.5, 0.06, 0.1), MAT.darkSteel, cx, B.h - 0.38, B.z0 + 0.05, g); mesh(bx(W - 0.5, 0.06, 0.1), MAT.darkSteel, cx, B.h - 1.32, B.z0 + 0.05, g); }
+    if (sp >= 6) {
+      const led = std(0x000000, 0.4, 0, { emissive: sp === 7 ? 0xdb2777 : 0x22d3ee, emissiveIntensity: 1.4 });
+      mesh(bx(W, 0.05, 0.05), led, cx, 0.95, B.z0 + 0.06, g, false, false); mesh(bx(0.05, 0.05, D), led, B.x0 + 0.06, 0.95, cz, g, false, false);
+      [wz(196), wz(106)].forEach((z) => { const l = mesh(new THREE.PlaneGeometry(W - 1.2, 0.04), led, cx, 0.008, z + 0.08, g, false, false); l.rotation.x = -Math.PI / 2; });
+    }
     g.traverse((c) => { if (c.isMesh && c.material === MAT.winGlass) c.castShadow = false; });
     staticBatch(g);
     return g;
@@ -441,6 +491,25 @@ export async function boot(I, onProgress) {
   let smokeEmitters = [];
 
   /* ---------- machines: T1 bench press, T2 hydraulic press, T3 CNC centre, T4 robot cell ---------- */
+  function makeRobot(parent, mat, x, z, sc) {
+    const R = {}; const base = new THREE.Group(); base.position.set(x, 0, z); base.scale.setScalar(sc || 1); parent.add(base); R.base = base;
+    mesh(cy(0.26, 0.3, 0.42, 20), MAT.paintDark, 0, 0.21, 0, base);
+    R.j1 = new THREE.Group(); R.j1.position.y = 0.42; base.add(R.j1);
+    mesh(cy(0.24, 0.24, 0.24, 20), mat, 0, 0.12, 0, R.j1);
+    R.j2 = new THREE.Group(); R.j2.position.set(0, 0.36, 0); R.j1.add(R.j2);
+    mesh(cy(0.13, 0.13, 0.38, 16), mat, 0, 0, 0, R.j2).rotation.z = Math.PI / 2;
+    mesh(bx(0.2, 0.9, 0.22, 0.05), mat, 0.0, 0.42, 0, R.j2);
+    R.j3 = new THREE.Group(); R.j3.position.set(0, 0.86, 0); R.j2.add(R.j3);
+    mesh(cy(0.11, 0.11, 0.3, 16), mat, 0, 0, 0, R.j3).rotation.z = Math.PI / 2;
+    mesh(bx(0.16, 0.16, 0.78, 0.04), mat, 0, 0.0, 0.36, R.j3);
+    mesh(cy(0.07, 0.07, 0.24, 12), MAT.darkSteel, 0, 0.0, -0.12, R.j3).rotation.x = Math.PI / 2;
+    R.j5 = new THREE.Group(); R.j5.position.set(0, 0, 0.78); R.j3.add(R.j5);
+    mesh(cy(0.06, 0.06, 0.16, 12), MAT.darkSteel, 0, 0, 0, R.j5).rotation.z = Math.PI / 2;
+    mesh(cy(0.05, 0.05, 0.12, 12), MAT.steel, 0, -0.1, 0, R.j5);
+    R.f1 = mesh(bx(0.02, 0.1, 0.05), MAT.steel, -0.05, -0.2, 0, R.j5); R.f2 = mesh(bx(0.02, 0.1, 0.05), MAT.steel, 0.05, -0.2, 0, R.j5);
+    R.grip = new THREE.Group(); R.grip.position.set(0, -0.28, 0); R.j5.add(R.grip);
+    return R;
+  }
   function stackLight(parent, x, y, z) {
     const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
     mesh(cy(0.012, 0.012, 0.25, 6), MAT.darkSteel, 0, 0.125, 0, g);
@@ -535,39 +604,29 @@ export async function boot(I, onProgress) {
       // robot cell: 6-axis arm on a pedestal, infeed table, compact press, mesh guarding
       mesh(boxW(2.7, 0.05, 1.9, 1), MAT.plate, 0, 0.025, 0, g, false, true);
       const posts = [[-1.35, -0.95], [1.35, -0.95], [-1.35, 0.95], [1.35, 0.95]];
-      posts.forEach(([x, z]) => mesh(bx(0.06, 1.7, 0.06), MAT.paintYellow, x, 0.85, z, g));
-      const panel = (w, x, z, ry) => { const p = mesh(new THREE.PlaneGeometry(w, 1.4), MAT.fence, x, 0.9, z, g, true, false); p.rotation.y = ry; };
+      posts.forEach(([x, z]) => mesh(bx(0.06, 1.7, 0.06), tier === 3 ? MAT.paintYellow : std(tier === 4 ? 0xe2e8f0 : 0x111827, 0.4, 0.5), x, 0.85, z, g));
+      const guardMat = tier === 3 ? MAT.fence : MAT.glass, postMat = tier === 3 ? MAT.paintYellow : tier === 4 ? std(0xe2e8f0, 0.4, 0.5) : std(0x111827, 0.4, 0.6);
+      const panel = (w, x, z, ry) => { const p = mesh(new THREE.PlaneGeometry(w, 1.4), guardMat, x, 0.9, z, g, tier === 3, false); p.rotation.y = ry; if (tier > 3) p.material = guardMat; };
       panel(2.7, 0, -0.95, 0); panel(1.9, -1.35, 0, Math.PI / 2); panel(1.9, 1.35, 0, Math.PI / 2);
-      mesh(bx(2.72, 0.04, 0.04), MAT.paintYellow, 0, 1.62, -0.95, g); mesh(bx(0.04, 0.04, 1.9), MAT.paintYellow, -1.35, 1.62, 0, g); mesh(bx(0.04, 0.04, 1.9), MAT.paintYellow, 1.35, 1.62, 0, g);
+      { const rm = tier === 3 ? MAT.paintYellow : std(0x000000, 0.4, 0, { emissive: tier === 4 ? 0x22d3ee : 0xdb2777, emissiveIntensity: 1.5 });
+        mesh(bx(2.72, 0.04, 0.04), rm, 0, 1.62, -0.95, g); mesh(bx(0.04, 0.04, 1.9), rm, -1.35, 1.62, 0, g); mesh(bx(0.04, 0.04, 1.9), rm, 1.35, 1.62, 0, g); void postMat; }
+      if (tier === 5) { const cv = mesh(new THREE.PlaneGeometry(0.9, 0.4), MAT.belt, -0.8, 0.84, 0.15, g, false, true); cv.rotation.x = -Math.PI / 2; mesh(bx(1.6, 0.06, 0.06), std(0x000000, 0.4, 0, { emissive: 0xdb2777, emissiveIntensity: 2 }), 0, 1.75, 0.95, g, false, false); }
       mesh(bx(0.7, 0.8, 0.6, 0.02), MAT.steel, -0.8, 0.4, 0.15, g); mesh(boxW(0.72, 0.03, 0.62, 0.5), MAT.plate, -0.8, 0.815, 0.15, g);
       const pr = new THREE.Group(); pr.position.set(0.85, 0, 0.1); g.add(pr);
       mesh(bx(0.7, 1.0, 0.7, 0.03), MAT.paintGrey, 0, 0.5, 0, pr); mesh(bx(0.7, 0.35, 0.7, 0.03), MAT.paintGrey, 0, 1.75, 0, pr);
       [-0.3, 0.3].forEach((x) => mesh(cy(0.04, 0.04, 0.8, 10), MAT.chrome, x, 1.35, 0, pr));
       A.ram = mesh(bx(0.5, 0.15, 0.5, 0.02), MAT.paintDark, 0, 1.45, 0, pr); A.ramY = 1.45; A.stroke = 0.32;
-      // the robot
-      const R = A.robot = {}; const base = new THREE.Group(); base.position.set(0, 0, -0.25); g.add(base);
-      mesh(cy(0.26, 0.3, 0.42, 20), MAT.paintDark, 0, 0.21, 0, base);
-      R.j1 = new THREE.Group(); R.j1.position.y = 0.42; base.add(R.j1);
-      mesh(cy(0.24, 0.24, 0.24, 20), MAT.paintOrange, 0, 0.12, 0, R.j1);
-      R.j2 = new THREE.Group(); R.j2.position.set(0, 0.36, 0); R.j1.add(R.j2);
-      mesh(cy(0.13, 0.13, 0.38, 16), MAT.paintOrange, 0, 0, 0, R.j2).rotation.z = Math.PI / 2;
-      mesh(bx(0.2, 0.9, 0.22, 0.05), MAT.paintOrange, 0.0, 0.42, 0, R.j2);
-      R.j3 = new THREE.Group(); R.j3.position.set(0, 0.86, 0); R.j2.add(R.j3);
-      mesh(cy(0.11, 0.11, 0.3, 16), MAT.paintOrange, 0, 0, 0, R.j3).rotation.z = Math.PI / 2;
-      mesh(bx(0.16, 0.16, 0.78, 0.04), MAT.paintOrange, 0, 0.0, 0.36, R.j3);
-      mesh(cy(0.07, 0.07, 0.24, 12), MAT.darkSteel, 0, 0.0, -0.12, R.j3).rotation.x = Math.PI / 2;
-      R.j5 = new THREE.Group(); R.j5.position.set(0, 0, 0.78); R.j3.add(R.j5);
-      mesh(cy(0.06, 0.06, 0.16, 12), MAT.darkSteel, 0, 0, 0, R.j5).rotation.z = Math.PI / 2;
-      mesh(cy(0.05, 0.05, 0.12, 12), MAT.steel, 0, -0.1, 0, R.j5);
-      R.f1 = mesh(bx(0.02, 0.1, 0.05), MAT.steel, -0.05, -0.2, 0, R.j5); R.f2 = mesh(bx(0.02, 0.1, 0.05), MAT.steel, 0.05, -0.2, 0, R.j5);
-      R.grip = new THREE.Group(); R.grip.position.set(0, -0.28, 0); R.j5.add(R.grip);
+      // the robot(s)
+      const armMat = tier === 3 ? MAT.paintOrange : tier === 4 ? std(0xf1f5f9, 0.35, 0.15) : std(0x1f2937, 0.35, 0.5);
+      A.robot = makeRobot(g, armMat, 0, -0.25, 1);
+      if (tier === 5) { A.robot2 = makeRobot(g, std(0xdb2777, 0.35, 0.3), -0.2, 0.62, 0.8); A.robot2.base.rotation.y = Math.PI; }
       A.work.position.set(0.85, 1.02, 0.1);
       A.infeed = new THREE.Group(); A.infeed.position.set(-0.8, 0.83, 0.15); g.add(A.infeed);
       const hmi = new THREE.Group(); hmi.position.set(-1.0, 0, -1.25); g.add(hmi);
       mesh(cy(0.04, 0.04, 1.0, 8), MAT.darkSteel, 0, 0.5, 0, hmi); mesh(bx(0.4, 0.3, 0.08, 0.02), MAT.paintDark, 0, 1.12, 0, hmi);
       mesh(new THREE.PlaneGeometry(0.32, 0.2), MAT.screen, 0, 1.13, -0.045, hmi, false, false).rotation.y = Math.PI;
       stackLight(g, 1.3, 1.64, -0.92); A.light = g.children[g.children.length - 1];
-      A.label = plateLabel('M' + (m.id + 1) + ' · ROBOT T4', 0.56, 0.18); A.label.position.set(0, 0.3, 0.97); g.add(A.label);
+      A.label = plateLabel('M' + (m.id + 1) + (tier === 3 ? ' · ROBOT T4' : tier === 4 ? ' · SMART T5' : ' · AI T6'), 0.56, 0.18); A.label.position.set(0, 0.3, 0.97); g.add(A.label);
     }
     // stack light handles
     const L = A.light; const lamps = []; L.traverse((c) => { if (c.isMesh && c.material.emissive && c.geometry.parameters && c.geometry.parameters.height === 0.075) lamps.push(c); });
@@ -634,10 +693,12 @@ export async function boot(I, onProgress) {
     return g;
   }
   const livery = signTex([{ t: 'GUNVORA', s: 150, y: 0.42, c: '#1e1b4b', w: 900 }, { t: 'FACTORY KINGDOM · LOGISTICS', s: 46, y: 0.78, c: '#e56f17', w: 700 }], { w: 1024, h: 340, bg: '#f4f5f6', stripe: '#3b3fbf' });
-  function buildTruck(big) {
+  const supplyLivery = signTex([{ t: 'GUNVORA SUPPLY', s: 120, y: 0.42, c: '#14532d', w: 900 }, { t: 'RAW MATERIALS · JUST IN TIME', s: 46, y: 0.78, c: '#a16207', w: 700 }], { w: 1024, h: 340, bg: '#f4f5f6', stripe: '#15803d' });
+  const eLivery = signTex([{ t: 'GUNVORA e-FLEET', s: 120, y: 0.42, c: '#0f172a', w: 900 }, { t: 'ZERO-EMISSION LOGISTICS', s: 46, y: 0.78, c: '#0d9488', w: 700 }], { w: 1024, h: 340, bg: '#f4f5f6', stripe: '#22c55e' });
+  function buildTruck(big, o = {}) {
     const g = new THREE.Group(), A = { wheels: [] }, L = big ? 6.6 : 5.2, boxL = big ? 4.6 : 3.3, H = big ? 2.6 : 2.25;
     const cabX = L / 2 - 0.85;
-    const paint = std(0xf4f5f6, 0.32, 0.25), cab = std(0x2c2f8f, 0.3, 0.45);
+    const paint = std(0xf4f5f6, 0.32, 0.25), cab = std(o.cab || 0x2c2f8f, 0.3, 0.45);
     mesh(bx(L - 0.3, 0.22, 1.0), MAT.darkSteel, 0, 0.62, 0, g);
     // cab (cab-over), windscreen, lights, mirrors, bumper
     mesh(bx(1.5, 1.6, 2.1, 0.12), cab, cabX, 1.55, 0, g);
@@ -649,7 +710,7 @@ export async function boot(I, onProgress) {
     [-1.12, 1.12].forEach((z) => { mesh(bx(0.05, 0.3, 0.14), MAT.black, cabX + 0.55, 2.1, z * 1.03, g); });
     // cargo box with GUNVORA livery and a roller door at the rear
     const box = mesh(bx(boxL, H, 2.2, 0.04), paint, cabX - 0.85 - boxL / 2, 0.75 + H / 2, 0, g);
-    const lv = new THREE.MeshStandardMaterial({ map: livery, roughness: 0.4, metalness: 0.1 });
+    const lv = new THREE.MeshStandardMaterial({ map: o.livery || livery, roughness: 0.4, metalness: 0.1 });
     const s1 = mesh(new THREE.PlaneGeometry(boxL * 0.86, boxL * 0.86 * 340 / 1024), lv, box.position.x, 0.75 + H * 0.58, 1.102, g, false, false); void s1;
     const s2 = mesh(new THREE.PlaneGeometry(boxL * 0.86, boxL * 0.86 * 340 / 1024), lv, box.position.x, 0.75 + H * 0.58, -1.102, g, false, false); s2.rotation.y = Math.PI;
     A.door = mesh(bx(0.03, H - 0.1, 2.0), std(0xd6d9dc, 0.4, 0.5), box.position.x - boxL / 2 - 0.02, 0.75 + H / 2, 0, g);
@@ -663,6 +724,36 @@ export async function boot(I, onProgress) {
     blobShadow(g, L + 0.6, 2.8, 0, 0, 0.75);
     g.traverse((c) => { if (c.isMesh && c.material === MAT.winGlass) c.castShadow = false; });
     g.userData.A = A; g.userData.len = L;
+    return g;
+  }
+  // tractor unit + 13.6 m-style box trailer (scaled to the yard); electric variant for the e-fleet
+  function buildSemi(electric) {
+    const g = new THREE.Group(), A = { wheels: [] }, L = 11.6, trL = 8.6, H = 2.7, cabX = L / 2 - 1.05;
+    const cab = std(electric ? 0x0f766e : 0xb91c1c, 0.28, 0.5), paint = std(0xf4f5f6, 0.32, 0.25);
+    mesh(bx(2.0, 0.3, 1.1), MAT.darkSteel, cabX - 0.4, 0.75, 0, g);
+    mesh(bx(1.7, 2.0, 2.3, 0.14), cab, cabX, 1.85, 0, g); mesh(bx(1.4, 0.5, 2.2, 0.1), cab, cabX - 0.1, 3.05, 0, g);
+    mesh(bx(0.04, 0.85, 2.0), MAT.winGlass, cabX + 0.86, 2.25, 0, g, false, false);
+    mesh(bx(0.22, 0.4, 2.34, 0.04), electric ? std(0x0f172a, 0.4, 0.3) : MAT.chrome, cabX + 0.8, 1.0, 0, g);
+    [-0.85, 0.85].forEach((z) => mesh(bx(0.05, 0.14, 0.34), std(0xffffff, 0.2, 0, { emissive: electric ? 0xbff6ff : 0xfff6dd, emissiveIntensity: 1.3 }), cabX + 0.86, 1.25, z, g, false, false));
+    if (!electric) { [-1.0, 1.0].forEach((z) => mesh(cy(0.07, 0.07, 1.6, 10), MAT.chrome, cabX - 0.92, 2.6, z, g)); }
+    else mesh(bx(1.0, 0.05, 0.25), std(0x000000, 0.4, 0, { emissive: 0x22c55e, emissiveIntensity: 1.6 }), cabX, 1.0, 1.16, g, false, false);
+    const tx = cabX - 1.0 - trL / 2;
+    const box = mesh(bx(trL, H, 2.45, 0.05), paint, tx, 1.25 + H / 2, 0, g);
+    const lv = new THREE.MeshStandardMaterial({ map: electric ? eLivery : livery, roughness: 0.4, metalness: 0.1 });
+    const lh = trL * 0.7 * 340 / 1024;
+    mesh(new THREE.PlaneGeometry(trL * 0.7, lh), lv, tx, 1.25 + H * 0.56, 1.228, g, false, false);
+    mesh(new THREE.PlaneGeometry(trL * 0.7, lh), lv, tx, 1.25 + H * 0.56, -1.228, g, false, false).rotation.y = Math.PI;
+    mesh(bx(trL, 0.2, 1.0), MAT.darkSteel, tx, 1.1, 0, g);
+    A.door = mesh(bx(0.03, H - 0.1, 2.3), std(0xd6d9dc, 0.4, 0.5), box.position.x - trL / 2 - 0.02, 1.25 + H / 2, 0, g);
+    A.doorH = H - 0.1; A.doorBaseY = 1.25 + H / 2;
+    A.cargo = new THREE.Group(); A.cargo.position.set(box.position.x - trL / 2 + 0.8, 1.4, 0); g.add(A.cargo);
+    for (let k = 0; k < 2; k++) { const p = pallet(); p.position.x = k * 1.3; p.scale.set(0.9, 1, 0.9); A.cargo.add(p); for (let i = 0; i < 4; i++) { const b = cardBox('toy'); b.position.set(k * 1.3 - 0.25 + (i % 2) * 0.5, 0.15, -0.22 + Math.floor(i / 2) * 0.44); A.cargo.add(b); } }
+    A.cargo.visible = false;
+    [cabX + 0.2, cabX - 1.2, tx - trL / 2 + 1.0, tx - trL / 2 + 2.2].forEach((x) => [-0.98, 0.98].forEach((z) => A.wheels.push(wheel(g, x, 0.5, z, 0.5, 0.34))));
+    blobShadow(g, L + 0.6, 3.0, 0, 0, 0.75);
+    g.traverse((c) => { if (c.isMesh && c.material === MAT.winGlass) c.castShadow = false; });
+    g.scale.setScalar(0.8);
+    g.userData.A = A; g.userData.len = L * 0.8; g.userData.electric = electric;
     return g;
   }
   function buildCart() {
@@ -753,6 +844,20 @@ export async function boot(I, onProgress) {
   const sheetGeo = new THREE.BoxGeometry(1.0, 0.018, 1.15);
   const sheetMat = std(0x9aa1a8, 0.38, 0.95, { roughnessMap: T.plate_arm });
   const rollerGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.62, 10); rollerGeo.rotateX(Math.PI / 2);
+  const XRAW = ['plastic', 'paper', 'electronics', 'composites'];
+  const XGEO = {
+    plastic: { geo: new RoundedBoxGeometry(0.36, 0.15, 0.52, 2, 0.06), mat: std(0x2a8fd0, 0.6, 0), per: 5, max: 24 },
+    paper: { geo: new THREE.CylinderGeometry(0.2, 0.2, 0.46, 18), mat: std(0xefe9dc, 0.85, 0), per: 5, max: 12 },
+    electronics: { geo: new THREE.BoxGeometry(0.34, 0.26, 0.36), mat: std(0xc0266d, 0.6, 0.05), per: 2, max: 24 },
+    composites: { geo: new THREE.BoxGeometry(0.76, 0.045, 1.12), mat: std(0x2f3a48, 0.35, 0.3), per: 2, max: 30 }
+  };
+  // local stacking pattern on a pallet (x across 0.8, z along 1.2)
+  function xrawPos(r, n) {
+    if (r === 'plastic') { const l = Math.floor(n / 4), k = n % 4; return [-0.19 + (k % 2) * 0.38, 0.22 + l * 0.15, -0.28 + Math.floor(k / 2) * 0.56, 0]; }
+    if (r === 'paper') { const l = Math.floor(n / 6), k = n % 6; return [-0.2 + (k % 2) * 0.4, 0.38 + l * 0.47, -0.42 + Math.floor(k / 2) * 0.42, 0]; }
+    if (r === 'electronics') { const l = Math.floor(n / 6), k = n % 6; return [-0.18 + (k % 2) * 0.36, 0.28 + l * 0.27, -0.38 + Math.floor(k / 2) * 0.38, 0]; }
+    return [0, 0.17 + n * 0.047, 0, (n % 3 - 1) * 0.01];
+  }
   function buildDynamic(sp) {
     if (dyn) { scene.remove(dyn.g); pickables.length = 0; }
     const B = SPACES[sp], g = new THREE.Group(); scene.add(g); dyn = { g, sp };
@@ -783,6 +888,14 @@ export async function boot(I, onProgress) {
     dyn.steelSpot = sp >= 1 ? [cols[1], Math.min(B.z1 - 1.4, 1.6)] : [cols[1], rows[2] + 1.35];
     dyn.steelPal = pallet(); dyn.steelPal.position.set(dyn.steelSpot[0], 0, dyn.steelSpot[1]); dyn.steelPal.rotation.y = Math.PI / 2; g.add(dyn.steelPal);
     dyn.sheets = new THREE.InstancedMesh(sheetGeo, sheetMat, 90); dyn.sheets.castShadow = true; dyn.sheets.receiveShadow = true; dyn.sheets.count = 0; g.add(dyn.sheets);
+    // later raws: plastic sacks, paper reels, ESD electronics boxes, composite panels (pallets right of the forklift lane)
+    const xr = Math.min(-8.0, B.x0 + 3.3), zs = sp >= 2 ? [-1.7, 0.0, 1.7, 3.4] : [rows[2] + 1.45, rows[2] + 2.9, rows[2] + 1.45, rows[2] + 2.9];
+    dyn.xraw = {};
+    XRAW.forEach((r, i) => {
+      const spot = [sp >= 2 ? xr : (i % 2 ? cols[1] : cols[0]), zs[i]], pl = pallet(); pl.rotation.y = Math.PI / 2; pl.position.set(spot[0], 0, spot[1]); pl.visible = false; g.add(pl);
+      const im = new THREE.InstancedMesh(XGEO[r].geo, XGEO[r].mat, XGEO[r].max); im.castShadow = true; im.receiveShadow = true; im.count = 0; g.add(im);
+      dyn.xraw[r] = { spot, pl, im };
+    });
     dyn.rawKey = '';
     { const t = signTex([{ t: '', s: 10, y: 0.5 }], { w: 512, h: 128 }); const sm = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.4), std(0xffffff, 0.5, 0.1, { map: t, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.25 })); sm.position.set((cols[0] + cols[1]) / 2, sp === 0 ? 2.5 : 2.9, B.z0 + 0.06); g.add(sm); dyn.rawSign = { tex: t, key: '' }; }
     const rawPick = mesh(bx(2.8, 2.0, rows[2] - rows[0] + 2.0), MAT.pick, (cols[0] + cols[1]) / 2, 1.0, (rows[0] + rows[2]) / 2, g, false, false); rawPick.userData.pick = { k: 'raw' }; pickables.push(rawPick);
@@ -838,7 +951,7 @@ export async function boot(I, onProgress) {
   let vehKind = -1;
   const beltPool = [];
   const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpP = new THREE.Vector3(), tmpE = new THREE.Euler();
-  const rawHidden = { wood: 0, steel: 0 };
+  const rawHidden = { wood: 0, steel: 0, plastic: 0, paper: 0, electronics: 0, composites: 0 };
   const chipsEl = document.createElement('div'); chipsEl.id = 'mchips'; wrap.appendChild(chipsEl);
   const chips = {};
 
@@ -875,7 +988,7 @@ export async function boot(I, onProgress) {
   }
   const workPieces = {};
   function workPiece(id, p) {
-    const k = id + p; if (!workPieces[k]) { const o = product(p); o.scale.multiplyScalar(p === 'chair' ? 0.55 : 0.9); o.traverse((c) => { if (c.isMesh) c.castShadow = true; }); workPieces[k] = o; }
+    const k = id + p; if (!workPieces[k]) { const o = product(p); o.scale.multiplyScalar(p === 'chair' ? 0.55 : ({ s: 0.9, m: 0.8, l: 0.62, xl: 0.55 })[sizeOf(p)]); o.traverse((c) => { if (c.isMesh) c.castShadow = true; }); workPieces[k] = o; }
     return workPieces[k];
   }
   function animMachines(S, dt, t) {
@@ -888,7 +1001,7 @@ export async function boot(I, onProgress) {
       g.position.x = wx(I.SLOTS[m.id].x) + (m.shake > 0 ? Math.sin(t * 60) * 0.03 : 0);
       // workpiece
       const wp = workPiece(m.id, m.product);
-      if (m.cyc && A.tier !== 3) { if (wp.parent !== A.work) A.work.add(wp); wp.visible = true; } else if (A.tier !== 3) wp.visible = false;
+      if (m.cyc && A.tier < 3) { if (wp.parent !== A.work) A.work.add(wp); wp.visible = true; } else if (A.tier < 3) wp.visible = false;
       const ph = m.cyc ? m.prog : 0;
       if (A.tier === 0 || A.tier === 1) {
         const strokes = A.tier === 0 ? 3 : 2, local = (ph * strokes) % 1, d = m.cyc ? pressCurve(local) : 0;
@@ -904,6 +1017,7 @@ export async function boot(I, onProgress) {
         if (m.cyc && Math.random() < dt * 25) spark(g.position.x + A.head.position.x - 0.1, 1.15, g.position.z + 0.05, 1, [0.9, 0.95, 1.0]);
       } else {
         robotPose(A.robot, m.cyc ? ph : 0);
+        if (A.robot2) { robotPose(A.robot2, m.cyc ? (ph + 0.5) % 1 : 0); A.robot2.j1.rotation.y *= -1; }
         // part travels: infeed -> gripper -> press
         if (m.cyc && ph < 0.22) { if (wp.parent !== A.infeed) A.infeed.add(wp); wp.position.set(0, 0, 0); wp.visible = true; }
         else if (m.cyc && ph < 0.52) { if (wp.parent !== A.robot.grip) A.robot.grip.add(wp); wp.position.set(0, -0.12, 0); wp.visible = true; }
@@ -931,7 +1045,13 @@ export async function boot(I, onProgress) {
     S.workers.forEach((w, i) => {
       const o = workers[i]; const X = wx(w.x), Z = wz(w.y);
       const dx = X - o.x, dz = Z - o.z, sp = Math.hypot(dx, dz) / Math.max(dt, 1e-4);
-      o.x = X; o.z = Z; o.root.position.set(X, 0, Z);
+      o.x = X; o.z = Z;
+      // keep people apart and out of machine bodies (smoothed visual offset; the sim position is unchanged)
+      let px = 0, pz = 0;
+      S.workers.forEach((w2, j) => { if (j === i) return; const ex = X - wx(w2.x), ez = Z - wz(w2.y), d = Math.hypot(ex, ez); if (d < 0.62) { const k = (0.62 - d) * 0.5; if (d < 1e-3) { px += (i < j ? -1 : 1) * k; } else { px += ex / d * k; pz += ez / d * k; } } });
+      S.machines.forEach((m2) => { const sl = I.SLOTS[m2.id], mx = wx(sl.x), mz = wz(sl.y), hx = m2.tier >= 3 ? 1.4 : 1.12, hz = m2.tier >= 3 ? 1.0 : 0.78; const ex = X + px - mx, ez = Z + pz - mz; if (Math.abs(ex) < hx && Math.abs(ez) < hz) { const ox = hx - Math.abs(ex), oz = hz - Math.abs(ez); if (oz <= ox) pz += Math.sign(ez || 1) * oz; else px += Math.sign(ex || 1) * ox; } });
+      const kk = Math.min(1, dt * 6); o.ox = lerp(o.ox || 0, px, kk); o.oz = lerp(o.oz || 0, pz, kk);
+      o.root.position.set(X + o.ox, 0, Z + o.oz);
       let face = null;
       if (Math.hypot(dx, dz) > 1e-4) face = Math.atan2(dx, dz);
       else if (w.st === 'op' || (w.st === 'fix' && w.tgt != null)) {
@@ -945,21 +1065,21 @@ export async function boot(I, onProgress) {
       else if (w.st === 'fix' || (m && m.cyc)) play(o, 'Interact', 1);
       else play(o, 'Idle', 1);
       o.carryBox.visible = !!w.carry;
-      if (w.carry && o.carryKind !== w.carry) { o.carryKind = w.carry; const s = BOXSIZE[w.carry]; o.carryBox.scale.set(s[0] * 0.9 / 0.94, s[1] * 0.9 / 0.94, s[2] * 0.9 / 0.94); }
-      if (w.st === 'fix' && Math.random() < dt * 6) spark(X + Math.sin(o.rot) * 0.5, 0.9, Z + Math.cos(o.rot) * 0.5, 3);
+      if (w.carry && o.carryKind !== w.carry) { o.carryKind = w.carry; const s = boxSize(w.carry); o.carryBox.scale.set(s[0] * 0.9 / 0.94, s[1] * 0.9 / 0.94, s[2] * 0.9 / 0.94); }
+      if (w.st === 'fix' && Math.random() < dt * 6) spark(X + o.ox + Math.sin(o.rot) * 0.5, 0.9, Z + o.oz + Math.cos(o.rot) * 0.5, 3);
       o.mixer.update(dt);
     });
   }
 
-  function vehHome(k) { return k === 0 ? [wx(I.DOCK_X), 6.9] : [wx(I.DOCK_X) - 4.4, 9.6]; }
+  function vehHome(k) { const d = wx(I.DOCK_X); return k === 0 ? [d, 6.9] : k === 1 ? [d - 4.4, 9.6] : k === 2 ? [d + 9.2, 9.6] : [d + 21, 9.6]; }
   function syncVehicles(S, dt, t) {
     if (vehKind !== S.vehicle) {
       vehicles.forEach((v) => scene.remove(v.g)); vehicles.length = 0; vehKind = S.vehicle;
       const v = I.D.vehicles[S.vehicle];
-      for (let k = 0; k < v.trips; k++) { const g = S.vehicle === 0 ? buildCart() : buildTruck(S.vehicle === 2); scene.add(g); vehicles.push({ g, x: vehHome(k)[0] }); }
+      for (let k = 0; k < v.trips; k++) { const g = S.vehicle === 0 ? buildCart() : S.vehicle >= 3 ? buildSemi(S.vehicle === 4) : buildTruck(S.vehicle === 2); scene.add(g); vehicles.push({ g, x: vehHome(k)[0] }); }
     }
     vehicles.forEach((v, k) => {
-      const A = v.g.userData.A, d = S.deliveries.filter((q) => q.slot === k)[0], [hx, hz] = vehHome(k);
+      const A = v.g.userData.A, d = S.deliveries.filter((q) => !q.ex && q.slot === k)[0], [hx, hz] = vehHome(k);
       let x = hx, loaded = false, door = 0;
       if (d) {
         const f = d.t / d.dur;
@@ -972,7 +1092,7 @@ export async function boot(I, onProgress) {
       A.cargo.visible = loaded;
       if (A.door) { A.door.scale.y = 1 - door * 0.85; A.door.position.y = A.doorBaseY + A.doorH * door * 0.42; }
       if (A.courier) { play(A.courier, Math.abs(dx) > 1e-4 ? 'Walk' : 'Idle', clamp(Math.abs(dx) / Math.max(dt, 1e-4) / 1.6, 0.6, 2.5)); A.courier.mixer.update(dt); }
-      if (S.vehicle > 0 && Math.abs(dx) > 1e-4 && Math.random() < 0.5) smoke(x - v.g.userData.len / 2 - 0.1, 0.35, hz + 0.8, { c: [0.35, 0.35, 0.36], a: 0.35, size: 0.25, grow: 0.8, life: 1.0, vy: 0.3, wind: -0.6 });
+      if (S.vehicle > 0 && !v.g.userData.electric && Math.abs(dx) > 1e-4 && Math.random() < 0.5) smoke(x - v.g.userData.len / 2 - 0.1, 0.35, hz + 0.8, { c: [0.35, 0.35, 0.36], a: 0.35, size: 0.25, grow: 0.8, life: 1.0, vy: 0.3, wind: -0.6 });
     });
   }
 
@@ -982,18 +1102,18 @@ export async function boot(I, onProgress) {
     while (beltPool.length < items.length) { const b = cardBox('toy'); b.userData.p = 'toy'; scene.add(b); beltPool.push(b); }
     beltPool.forEach((b, i) => {
       const it = items[i]; b.visible = !!it; if (!it) return;
-      if (b.userData.p !== it.p) { const s = BOXSIZE[it.p]; b.scale.set(s[0], s[1], s[2]); b.userData.p = it.p; }
+      if (b.userData.p !== it.p) { const s = boxSize(it.p); b.scale.set(s[0], s[1], s[2]); b.userData.p = it.p; }
       b.position.set(wx(it.x), 0.745, wz(it.y)); b.rotation.y = (i % 3) * 0.06;
     });
   }
 
   function syncStores(S) {
     // rack contents
-    const R = dyn.rack, total = Math.min(R.slots.length, S.goods.toy + S.goods.chair + S.goods.bucket);
-    const key = S.goods.toy + ',' + S.goods.chair + ',' + S.goods.bucket;
+    const R = dyn.rack, PK = Object.keys(I.D.products), total = Math.min(R.slots.length, PK.reduce((a, p) => a + (S.goods[p] || 0), 0));
+    const key = PK.map((p) => S.goods[p] || 0).join(',');
     if (dyn.goodsKey !== key) {
       dyn.goodsKey = key; let i = 0;
-      ['toy', 'chair', 'bucket'].forEach((p) => { for (let n = 0; n < S.goods[p] && i < total; n++, i++) { const s = R.slots[i], sz = BOXSIZE[p]; tmpE.set(0, ((i * 37) % 7 - 3) * 0.015, 0); tmpQ.setFromEuler(tmpE); tmpM.compose(tmpP.set(s[0], s[1], s[2]), tmpQ, tmpS.set(sz[0], sz[1], sz[2])); dyn.goods.setMatrixAt(i, tmpM); } });
+      PK.forEach((p) => { for (let n = 0; n < (S.goods[p] || 0) && i < total; n++, i++) { const s = R.slots[i], sz = boxSize(p); tmpE.set(0, ((i * 37) % 7 - 3) * 0.015, 0); tmpQ.setFromEuler(tmpE); tmpM.compose(tmpP.set(s[0], s[1], s[2]), tmpQ, tmpS.set(sz[0], sz[1], sz[2])); dyn.goods.setMatrixAt(i, tmpM); } });
       dyn.goods.count = i; dyn.goods.instanceMatrix.needsUpdate = true; dyn.goods.computeBoundingSphere();
       const cap = I.D.spaces[S.space].goods, gt = I.goodsTotal(), full = gt >= cap;
       const c = dyn.shelfSign.tex.userData.ctx, w = 512, h = 128;
@@ -1003,7 +1123,8 @@ export async function boot(I, onProgress) {
     }
     // raw store
     const wood = Math.max(0, S.raw.wood - rawHidden.wood), steel = Math.max(0, S.raw.steel - rawHidden.steel);
-    const rk = wood + ',' + steel + ',' + S.level;
+    const xq = XRAW.map((r) => Math.max(0, (S.raw[r] || 0) - (rawHidden[r] || 0)));
+    const rk = wood + ',' + steel + ',' + S.level + ',' + xq.join(',');
     if (dyn.rawKey !== rk) {
       dyn.rawKey = rk; let i = 0;
       for (let n = 0; n < Math.min(wood, dyn.rawSpots.length * 20); n++) {
@@ -1014,31 +1135,70 @@ export async function boot(I, onProgress) {
       const showSteel = S.space >= 1 && (S.level >= 9 || steel > 0); dyn.steelPal.visible = showSteel;
       let j = 0; if (showSteel) for (let n = 0; n < Math.min(steel, 90); n++) { tmpQ.setFromEuler(tmpE.set(0, Math.PI / 2 + ((n * 13) % 5 - 2) * 0.01, 0)); tmpM.compose(tmpP.set(dyn.steelSpot[0], 0.155 + n * 0.02, dyn.steelSpot[1]), tmpQ, tmpS.set(1, 1, 1)); dyn.sheets.setMatrixAt(j++, tmpM); }
       dyn.sheets.count = j; dyn.sheets.instanceMatrix.needsUpdate = true; dyn.sheets.computeBoundingSphere();
-      const cap = I.D.spaces[S.space].raw, c = dyn.rawSign.tex.userData.ctx, w = 512, h = 128, rt = S.raw.wood + S.raw.steel;
+      XRAW.forEach((r, ri) => {
+        const X = dyn.xraw[r], G = XGEO[r], on = S.level >= I.D.raws[r].unlock || (S.raw[r] || 0) > 0; X.pl.visible = on;
+        const n = on ? Math.min(G.max, Math.ceil(xq[ri] / G.per)) : 0;
+        for (let k = 0; k < n; k++) { const q = xrawPos(r, k); tmpQ.setFromEuler(tmpE.set(0, q[3], 0)); tmpM.compose(tmpP.set(X.spot[0] + q[0], q[1], X.spot[1] + q[2]), tmpQ, tmpS.set(1, 1, 1)); X.im.setMatrixAt(k, tmpM); }
+        X.im.count = n; X.im.instanceMatrix.needsUpdate = true; X.im.computeBoundingSphere();
+      });
+      const RK = Object.keys(I.D.raws).filter((r) => S.level >= I.D.raws[r].unlock || (S.raw[r] || 0) > 0);
+      const cap = I.D.spaces[S.space].raw, c = dyn.rawSign.tex.userData.ctx, w = 512, h = 128, rt = RK.reduce((a, r) => a + (S.raw[r] || 0), 0);
+      const SH = { wood: 'WOOD', steel: 'STEEL', plastic: 'PLAST', paper: 'PAPER', electronics: 'ELEC', composites: 'COMP' };
       c.fillStyle = '#111827'; c.fillRect(0, 0, w, h); c.fillStyle = '#a16207'; c.fillRect(0, h - 10, w, 10);
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#9ca3af'; c.font = '700 26px ' + FONT; c.fillText('RAW STORE ' + rt + ' / ' + cap, w / 2, 32);
-      c.fillStyle = '#fff'; c.font = '800 44px ' + FONT; c.fillText('WOOD ' + S.raw.wood + (S.level >= 9 || S.raw.steel ? '  ·  STEEL ' + S.raw.steel : ''), w / 2, 80); dyn.rawSign.tex.needsUpdate = true;
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#9ca3af'; c.font = '700 26px ' + FONT; c.fillText('RAW STORE ' + rt + ' / ' + cap, w / 2, 26);
+      c.fillStyle = '#fff';
+      if (RK.length <= 2) { c.font = '800 44px ' + FONT; c.fillText(RK.map((r) => SH[r] + ' ' + S.raw[r]).join('  ·  '), w / 2, 78); }
+      else { c.font = '800 25px ' + FONT; const a1 = RK.slice(0, 3), a2 = RK.slice(3); c.fillText(a1.map((r) => SH[r] + ' ' + S.raw[r]).join(' · '), w / 2, 62); if (a2.length) c.fillText(a2.map((r) => SH[r] + ' ' + S.raw[r]).join(' · '), w / 2, 94); }
+      dyn.rawSign.tex.needsUpdate = true;
     }
   }
 
   // forklift delivery of raw material
   function startForklift(r, n) {
-    rawHidden[r] += n; fkQueue.push({ r, n });
+    rawHidden[r] = (rawHidden[r] || 0) + n;
+    const q = fkQueue.find((j) => j.r === r); if (q) q.n += n; else fkQueue.push({ r, n });
   }
+  // supplier truck: drives in along the road, waits while the forklift unloads, then U-turns away
+  const supplier = { g: buildTruck(false, { cab: 0x15803d, livery: supplyLivery }), st: 'away', x: -90, u: 0, idle: 0, lx: -90 };
+  supplier.g.visible = false; scene.add(supplier.g);
+  const SUP_X = -22, SUP_Z = 10.0;
+  function stepSupplier(dt) {
+    const T = supplier, g = T.g, A = g.userData.A, need = fkQueue.length || fkTrip;
+    if (T.st === 'away') { if (!need) { g.visible = false; return; } T.st = 'in'; T.x = -80; g.visible = true; A.cargo.visible = true; }
+    let x = T.x, z = SUP_Z, yaw = 0;
+    if (T.st === 'in') { const v = Math.min(16, (SUP_X - T.x) * 1.6 + 0.6); T.x = Math.min(SUP_X, T.x + v * dt); x = T.x; if (T.x >= SUP_X - 0.01) { T.st = 'parked'; T.idle = 0; } }
+    else if (T.st === 'parked') { x = SUP_X; if (!need) { T.idle += dt; if (T.idle > 1.2) { T.st = 'out'; T.u = 0; A.cargo.visible = false; } } else T.idle = 0; }
+    else if (T.st === 'out') {
+      T.u += dt; const Rr = 1.6, arc = Math.PI * Rr / 3.5;
+      if (T.u < arc) { const th = T.u / arc * Math.PI; x = SUP_X + Rr * Math.sin(th); z = 8.4 + Rr * Math.cos(th); yaw = th; }
+      else { const e = T.u - arc; x = SUP_X - 3.5 * e - 5 * e * e; z = 6.8; yaw = Math.PI; if (x < -90) { T.st = 'away'; g.visible = false; } }
+    }
+    const dx = Math.hypot(x - T.lx, 0); T.lx = x;
+    g.position.set(x, 0, z); g.rotation.y = yaw;
+    A.wheels.forEach((wl) => { wl.rotation.z -= (T.st === 'parked' ? 0 : Math.max(dx, dt * 3)) / 0.45; });
+    if (A.door) { const o = T.st === 'parked' ? 1 : 0; A.door.scale.y = 1 - o * 0.85; A.door.position.y = A.doorBaseY + A.doorH * o * 0.42; }
+    if (T.st !== 'parked' && Math.random() < 0.4) smoke(x - Math.cos(yaw) * 2.7, 0.35, z + Math.sin(yaw) * 2.7 + 0.8, { c: [0.35, 0.35, 0.36], a: 0.3, size: 0.25, grow: 0.8, life: 1.0, vy: 0.3, wind: -0.6 });
+  }
+  const FK_LOAD = {
+    wood: (L, n) => { for (let i = 0; i < Math.min(15, n); i++) { const pl = new THREE.Mesh(plankGeo, plankMat); pl.castShadow = true; pl.rotation.y = Math.PI / 2; pl.scale.set(0.8, 1, 0.8); pl.position.set(-0.33 + (i % 5) * 0.165, 0.18 + Math.floor(i / 5) * 0.07, 0); L.add(pl); } },
+    steel: (L, n) => { for (let i = 0; i < Math.min(15, n); i++) { const sh = new THREE.Mesh(sheetGeo, sheetMat); sh.scale.set(0.8, 1, 0.8); sh.rotation.y = Math.PI / 2; sh.position.y = 0.16 + i * 0.02; sh.castShadow = true; L.add(sh); } }
+  };
+  XRAW.forEach((r) => { FK_LOAD[r] = (L, n) => { const G = XGEO[r], k = Math.min(r === 'paper' ? 6 : r === 'composites' ? 12 : 8, Math.ceil(n / G.per)); for (let i = 0; i < k; i++) { const q = xrawPos(r, i), m = new THREE.Mesh(G.geo, G.mat); m.castShadow = true; m.position.set(q[2] * 0.8, q[1] - 0.04, q[0] * 0.8); m.rotation.y = Math.PI / 2; m.scale.setScalar(0.85); L.add(m); } }; });
   function stepForklift(S, dt) {
-    if (!fkTrip && fkQueue.length) {
+    stepSupplier(dt);
+    if (!fkTrip && fkQueue.length && supplier.st === 'parked') {
       const job = fkQueue.shift(), B = SPACES[S.space];
       let tx, tz;
       if (job.r === 'steel') { tx = dyn.steelSpot[0]; tz = dyn.steelSpot[1]; }
+      else if (dyn.xraw[job.r]) { [tx, tz] = dyn.xraw[job.r].spot; }
       else { const idx = Math.min(dyn.rawSpots.length - 1, Math.floor(Math.max(0, S.raw.wood - 1) / 20)); [tx, tz] = dyn.rawSpots[idx]; }
-      const gx = dyn.fkGapX, pts = [[-26, 6.9]];
+      const gx = dyn.fkGapX, pts = [[SUP_X - 4.0, SUP_Z], [SUP_X - 2.0, 7.2], [-14, 6.9]];
       if (S.space === 0) pts.push([-11.8, 6.9], [-11.8, 1.6], [gx, 1.6]); else pts.push([gx, 6.9]);
       pts.push([gx, B.z1 - 0.3], [gx, tz + 1.9], [tx, tz + 1.35]);
       fkTrip = { job, pts, seg: 0, s: 0, dir: 1, wait: 0 };
       const L = forklift.userData.A.load; L.clear();
       const p = pallet(); p.scale.set(0.8, 1, 0.8); L.add(p);
-      if (job.r === 'wood') for (let i = 0; i < Math.min(15, job.n); i++) { const pl = new THREE.Mesh(plankGeo, plankMat); pl.castShadow = true; pl.rotation.y = Math.PI / 2; pl.scale.set(0.8, 1, 0.8); pl.position.set(-0.33 + (i % 5) * 0.165, 0.18 + Math.floor(i / 5) * 0.07, 0); L.add(pl); }
-      else for (let i = 0; i < Math.min(15, job.n); i++) { const sh = new THREE.Mesh(sheetGeo, sheetMat); sh.scale.set(0.8, 1, 0.8); sh.rotation.y = Math.PI / 2; sh.position.y = 0.16 + i * 0.02; sh.castShadow = true; L.add(sh); }
+      (FK_LOAD[job.r] || FK_LOAD.wood)(L, job.n);
       forklift.visible = true; forklift.position.set(pts[0][0], 0, pts[0][1]);
     }
     if (!fkTrip) { forklift.visible = false; return; }
@@ -1049,7 +1209,7 @@ export async function boot(I, onProgress) {
       if (F.wait <= 0) F.dir = -1;
       A.driver.mixer.update(dt); return;
     }
-    const a = F.pts[F.seg], b = F.pts[F.seg + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), spd = 6.5;
+    const a = F.pts[F.seg], b = F.pts[F.seg + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), spd = 8;
     F.s += spd * dt * F.dir;
     if (F.dir > 0 && F.s >= L) { if (F.seg < F.pts.length - 2) { F.s -= L; F.seg++; } else { F.s = L; F.wait = 1.4; A.fork.position.y = 0.82; } }
     if (F.dir < 0 && F.s <= 0) { if (F.seg > 0) { F.seg--; const a2 = F.pts[F.seg], b2 = F.pts[F.seg + 1]; F.s += Math.hypot(b2[0] - a2[0], b2[1] - a2[1]); } else { fkTrip = null; forklift.visible = false; return; } }
@@ -1092,8 +1252,9 @@ export async function boot(I, onProgress) {
   }
   function clampTarget() {
     const b = cam.bounds; if (!b) return;
-    cam.goalT.x = clamp(cam.goalT.x, b.x0 - 2, b.x1 + 4); cam.goalT.z = clamp(cam.goalT.z, b.z0 - 2, b.z1 + 4);
-    cam.goalD = clamp(cam.goalD, cam.fit * 0.32, cam.fit * 1.25);
+    const big = bigWorld();
+    cam.goalT.x = clamp(cam.goalT.x, b.x0 - (big ? 40 : 2), b.x1 + (I.S.fleet >= 3 ? 40 : 4)); cam.goalT.z = clamp(cam.goalT.z, b.z0 - (I.S.hubs ? 60 : big ? 30 : 2), b.z1 + 4);
+    cam.goalD = clamp(cam.goalD, cam.fit * 0.32, cam.fit * (big ? 2.4 : 1.25));
   }
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   function groundAt(cx, cy) {
@@ -1147,23 +1308,25 @@ export async function boot(I, onProgress) {
     v3.set(X, Y, Z).project(camera); const w = canvas.clientWidth, h = canvas.clientHeight;
     return { x: (v3.x + 1) / 2 * w, y: (1 - v3.y) / 2 * h, vis: v3.z < 1 };
   }
-  const TOPH = [1.9, 3.3, 2.55, 2.0];
+  const TOPH = [1.9, 3.3, 2.55, 2.0, 2.1, 2.3];
   function updateChips(S) {
     S.machines.forEach((m) => {
       let c = chips[m.id]; if (!c) { c = chips[m.id] = document.createElement('div'); c.className = 'mchip'; c.innerHTML = '<b></b><span></span><i><u></u></i>'; chipsEl.appendChild(c); c._k = ''; }
       const s = I.SLOTS[m.id], p = project(wx(s.x), TOPH[m.tier] + 0.35, wz(s.y));
       c.style.transform = 'translate(' + Math.round(p.x) + 'px,' + Math.round(p.y) + 'px) translate(-50%,-100%)';
       const st = m.broken ? (m.repair > 0 ? 'rep' : 'bad') : m.cyc ? 'run' : 'idle';
-      const label = m.broken ? (m.repair > 0 ? 'Repair ' + Math.ceil(m.repair) + 's' : 'Breakdown') : m.cyc ? I.D.products[m.product].name : shortReason(m, S);
-      const k = st + label + m.tier;
-      if (c._k !== k) { c._k = k; c.className = 'mchip ' + st; c.children[0].textContent = 'M' + (m.id + 1); c.children[1].textContent = label; }
+      const label = m.broken ? (m.repair > 0 ? '🔧 ' + Math.ceil(m.repair) + 's' : '💥') : m.cyc ? I.D.products[m.product].icon : shortReason(m, S);
+      const far = cam.dist > cam.fit * 0.85 && S.machines.length > 3 && !m.broken;
+      const k = st + label + m.tier + far;
+      if (c._k !== k) { c._k = k; c.className = 'mchip ' + st + (far ? ' far' : ''); c.children[0].textContent = 'M' + (m.id + 1); c.children[1].textContent = label; }
       c.children[2].firstChild.style.width = (m.cyc ? Math.round(m.prog * 100) : m.broken && m.repair > 0 ? Math.round(100 - m.repair / 8 * 100) : Math.round(m.cond)) + '%';
     });
     Object.keys(chips).forEach((id) => { if (!S.machines[id]) { chips[id].remove(); delete chips[id]; } });
   }
   function shortReason(m, S) {
     const r = I.blockReason(m);
-    if (/^No (wood|steel)/.test(r)) return 'No ' + r.split(' ')[1].replace('!', '');
+    if (/^No (wood|steel|plastic|paper|electronics|composite)/i.test(r)) return 'No ' + r.split(' ')[1].replace('!', '').toLowerCase();
+    if (/needs|Build the/i.test(r)) return 'Needs line';
     if (/tray full/.test(r)) return 'Tray full';
     if (/Shelf full/.test(r)) return 'Shelf full';
     if (/No operator/.test(r)) return 'Tap to run';
@@ -1200,23 +1363,42 @@ export async function boot(I, onProgress) {
   }
 
   /* ---------- frame ---------- */
-  let ftAvg = 16, ftN = 0, chimneyT = 0, lastSpace = -1;
+  let ftAvg = 16, ftN = 0, chimneyT = 0, lastSpace = -1, buildAnim = null, empire = null, empireLoading = false;
+  function loadEmpire() {
+    empireLoading = true;
+    import('./scene3d-empire.js').then((mod) => {
+      empire = mod.createEmpire({ THREE, scene, mesh, bx, cy, boxW, std, MAT, signboard, canvasTex, staticBatch, blobShadow, pallet, cardBox, spark, smoke, makeRobot, robotPose, wx, wz, I, rnd, lerp, clamp, ease, FONT });
+    }).catch((err) => { console.warn('empire load failed', err); });
+  }
+  const bigWorld = () => { const S = I.S; return !!(S.fleet || S.plants || S.hubs); };
   const adaptive = !navigator.webdriver;
   function render(dt, t) {
     const S = I.S;
     if (S.space !== builtSpace) {
       const first = builtSpace < 0;
       buildBuilding(S.space); buildDynamic(S.space); dyn.convBuilt = false;
+      if (!first) { buildAnim = { g: buildingGroup, t: 0 }; buildingGroup.scale.y = 0.02; }
       Object.keys(machines).forEach((id) => { const e = machines[id]; if (e.pick && !pickables.includes(e.pick)) pickables.push(e.pick); });
       fitCamera(S.space, first); lastSpace = S.space;
     }
     syncMachines(S); updateBays(S); animMachines(S, dt, t);
     syncWorkers(S, dt, t); syncVehicles(S, dt, t); syncBelt(S, I.belt(), dt); syncStores(S); stepForklift(S, dt);
     smokeEmitters.forEach((e) => { e.acc = (e.acc || 0) + dt * e.rate; while (e.acc > 1) { e.acc -= 1; smoke(e.x, e.y, e.z, { c: [0.75, 0.76, 0.78], a: 0.35, size: rnd(0.8, 1.2), grow: 1.4, life: rnd(3, 4.5), vy: rnd(0.9, 1.3), wind: 0.6 }); } });
+    if (buildAnim) {
+      const B = SPACES[builtSpace]; buildAnim.t += dt; const f = clamp(buildAnim.t / 1.8, 0, 1);
+      buildAnim.g.scale.y = Math.max(0.02, 1 - Math.pow(1 - f, 3));
+      if (Math.random() < 0.8) dust(B.x0, B.x1, B.z0 - 0.5, B.z1 + 0.5, 2);
+      if (Math.random() < 0.3) spark(rnd(B.x0, B.x1), B.h * buildAnim.g.scale.y, B.z0 + rnd(0, 0.5), 6, [1, 0.8, 0.4]);
+      if (f >= 1) { buildAnim.g.scale.y = 1; buildAnim = null; }
+    }
+    if (!empire && !empireLoading && (Object.keys(S.fac || {}).some((k) => S.fac[k]) || S.fleet || S.plants || S.hubs)) loadEmpire();
+    if (empire) empire.sync(S, dt, t, SPACES[builtSpace], builtSpace);
+    stepFx(dt);
     stepParticles(dt);
     // camera easing
     const k = 1 - Math.exp(-dt * 8);
     cam.target.lerp(cam.goalT, k); cam.dist = lerp(cam.dist, cam.goalD, k); applyCam();
+    { const fn = Math.max(60, cam.dist * 1.25); if (Math.abs(scene.fog.near - fn) > 0.5) { scene.fog.near = fn; scene.fog.far = fn + 90; camera.far = fn + 160; camera.updateProjectionMatrix(); } }
     sun.position.copy(cam.target).add(SUN_OFF); sun.target.position.copy(cam.target); sun.target.updateMatrixWorld();
     pUniforms.scale.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     if (composer) composer.render(dt); else renderer.render(scene, camera);
@@ -1241,7 +1423,44 @@ export async function boot(I, onProgress) {
     if (name === 'shelf' && dyn) return boxRect(dyn.shelfBox);
     return null;
   }
+  /* ---------- 3D coins + fireworks ---------- */
+  const coinGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.035, 20), coinMat = std(0xf5c542, 0.25, 1, { emissive: 0x7a5200, emissiveIntensity: 0.35 });
+  const coins = [], coinPool = [];
+  function spawnCoins(x, y, z, n, ex) {
+    for (let i = 0; i < n; i++) {
+      const m = coinPool.pop() || new THREE.Mesh(coinGeo, coinMat); m.castShadow = true; m.visible = true; m.scale.setScalar(1); scene.add(m);
+      m.position.set(x + rnd(-0.3, 0.3), y, z + rnd(-0.3, 0.3)); m.rotation.set(Math.PI / 2, 0, rnd(0, 6));
+      coins.push({ m, vx: rnd(-1.4, 1.4), vy: rnd(4.2, 6.2), vz: rnd(-1.4, 1.4), life: 1.3 + rnd(0, 0.3), max: 1.6, spin: rnd(8, 14) });
+    }
+    spark(x, y + 0.3, z, 14, [1, 0.85, 0.3]); if (ex) spark(x, y + 0.3, z, 10, [0.4, 0.75, 1]);
+  }
+  const rockets = [];
+  function firework(x, z, col) { rockets.push({ x, y: 0.5, z, vy: rnd(11, 14), vx: rnd(-1, 1), vz: rnd(-1, 1), t: 0, fuse: rnd(0.8, 1.1), col }); }
+  function stepFx(dt) {
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const c = coins[i]; c.life -= dt; c.vy -= 9.8 * dt; c.m.position.x += c.vx * dt; c.m.position.y += c.vy * dt; c.m.position.z += c.vz * dt; c.m.rotation.z += c.spin * dt;
+      if (c.m.position.y < 0.05) { c.m.position.y = 0.05; c.vy = Math.abs(c.vy) * 0.35; c.vx *= 0.5; c.vz *= 0.5; }
+      if (c.life < 0.3) c.m.scale.setScalar(Math.max(0.01, c.life / 0.3));
+      if (c.life <= 0) { scene.remove(c.m); coinPool.push(c.m); coins.splice(i, 1); }
+    }
+    for (let i = rockets.length - 1; i >= 0; i--) {
+      const r = rockets[i]; r.t += dt; r.vy -= 6 * dt; r.x += r.vx * dt; r.y += r.vy * dt; r.z += r.vz * dt;
+      emit(sparks, { x: r.x, y: r.y, z: r.z, vx: rnd(-0.2, 0.2), vy: -0.5, vz: rnd(-0.2, 0.2), life: 0.35, max: 0.35, size: 0.12, c: [1, 0.8, 0.5], g: 0 });
+      if (r.t >= r.fuse) {
+        for (let k = 0; k < 70; k++) { const th = rnd(0, TAU), ph = Math.acos(rnd(-1, 1)), v = rnd(4, 6.5); emit(sparks, { x: r.x, y: r.y, z: r.z, vx: Math.sin(ph) * Math.cos(th) * v, vy: Math.cos(ph) * v, vz: Math.sin(ph) * Math.sin(th) * v, life: rnd(0.9, 1.4), max: 1.4, size: rnd(0.25, 0.35), c: r.col, g: 2.5 }); }
+        rockets.splice(i, 1);
+      }
+    }
+  }
+  const FWC = [[1, 0.45, 0.2], [0.35, 0.8, 1], [1, 0.85, 0.3], [0.6, 1, 0.5], [1, 0.4, 0.8]];
+  function celebrate(n) { const B = SPACES[builtSpace] || SPACES[0], c = Math.min(6, 3 + Math.floor((n || 1) / 50)); for (let i = 0; i < c; i++) setTimeout(() => firework(rnd(B.x0 + 2, B.x1 - 2), rnd(B.z0 + 1, B.z1 - 1), FWC[(i + (n || 0)) % FWC.length]), i * 260); }
+  function dust(x0, x1, z0, z1, n) { for (let i = 0; i < n; i++) smoke(rnd(x0, x1), 0.3, rnd(z0, z1), { c: [0.72, 0.68, 0.6], a: 0.5, size: rnd(0.9, 1.6), grow: 1.6, life: rnd(1.4, 2.4), vy: rnd(0.4, 0.9), wind: 0.2 }); }
   function fx(kind, d) {
+    if (kind === 'coins' && d) { spawnCoins(wx(d.x), 1.2, wz(d.y), Math.min(12, Math.max(3, d.n || 6)), d.ex); return; }
+    if (kind === 'celebrate') { celebrate(d && d.n); return; }
+    if (kind === 'levelStart') { return; }
+    if (kind === 'build') { const B = SPACES[builtSpace] || SPACES[0]; dust(B.x0, B.x1, B.z0, B.z1, 24); for (let i = 0; i < 6; i++) spark(rnd(B.x0, B.x1), 1.5, rnd(B.z0, B.z1), 8, [1, 0.8, 0.45]); if (empire) empire.fx('build', d, I.S); return; }
+    if (kind === 'plant') { if (empire) empire.fx('plant', d, I.S); return; }
     const e = d && d.id != null ? machines[d.id] : null, P = e ? e.g.position : null;
     if (kind === 'tap' && P) spark(P.x, 1.1, P.z + 0.3, 14);
     else if (kind === 'finish' && P) { if (!d.ok) { spark(P.x, 1.0, P.z + 0.4, 12, [0.35, 0.33, 0.3]); smoke(P.x, 1.0, P.z + 0.4, { c: [0.3, 0.3, 0.3], a: 0.4, size: 0.4, life: 1.2 }); } }

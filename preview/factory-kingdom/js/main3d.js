@@ -8,6 +8,8 @@ function fallback(err) {
   console.warn('3D renderer unavailable, using 2D view:', err && err.message ? err.message : err);
   I.attach(null); const l = document.getElementById('loader'); if (l) l.remove();
 }
+if (!window.FK_3D_PENDING) { settled = true; } else start();
+function start() {
 const guard = setTimeout(() => fallback(new Error('load timeout')), 60000);
 boot(I, (p) => { const v = Math.round(p * 100); if (bar) bar.style.width = v + '%'; if (pct) pct.textContent = v + '%'; })
   .then((api) => {
@@ -16,3 +18,4 @@ boot(I, (p) => { const v = Math.round(p * 100); if (bar) bar.style.width = v + '
     const l = document.getElementById('loader'); if (l) { l.classList.add('done'); setTimeout(() => l.remove(), 450); }
   })
   .catch((err) => { clearTimeout(guard); fallback(err); });
+}

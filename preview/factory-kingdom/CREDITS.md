@@ -53,7 +53,8 @@ These are procedural and original to this project (no third-party assets):
 - Machines: bench press, hydraulic press, CNC centre and robot cell
 - Conveyors
 - Trucks, van and forklift
-- Products (toy car, chair, bucket) and pallets
+- Products (all 23, js/scene3d-products.js) and pallets
+- Robot arms, AGVs, print line, trains, container ship, STS cranes, cargo plane, plants, hubs (js/scene3d-empire.js)
 - Signage and UI icons
 - Building shells
 - Particles

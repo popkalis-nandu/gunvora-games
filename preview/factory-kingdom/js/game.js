@@ -1,4 +1,4 @@
-/* Factory Kingdom 250 · GUNVORA GAMES — playable prototype (levels 1–10).
+/* Factory Kingdom 250 · GUNVORA GAMES — 250 levels across six eras (1–50 free, 51–250 premium preview).
    Simulation + HUD in plain JS. The 3D renderer (js/scene3d.js, three.js) attaches through window.FK_INT;
    if WebGL is unavailable the original 2D canvas renderer is used as a fallback. */
 (function () {
@@ -11,10 +11,11 @@
   var ROWS = [150, 240], COLS = [105, 195, 285];
   var SLOTS = [[0, 0], [1, 0], [0, 1], [1, 1], [2, 0], [2, 1]].map(function (s) { return { x: COLS[s[0]], y: ROWS[s[1]] }; });
   var SHELF_X = 332, DOCK_X = 345, ROAD_Y = 344;
+  var EXPORTERS = ["Dubai Retail LLC", "Tokyo Mart", "Berlin Haus GmbH", "Lagos Traders", "Sydney Supply Co.", "Toronto Goods", "Paris Maison", "Singapore Hub Pte", "Nairobi Wholesale", "Seoul Living", "Riyadh Markets", "Chicago Depot"];
   var CUSTOMERS = ["Sharma Toys", "City Mart", "Kids Corner", "Green Home", "Metro Stores", "Bharat Traders", "Sunrise Retail", "Happy Kids Co.", "Lotus Furnishing", "Royal Bazaar", "Star Hardware", "Ganga Supplies"];
   var AVATAR = ["#f97316", "#4f46e5", "#059669", "#db2777", "#0891b2", "#ca8a04"];
 
-  var S, T = 0, tab = "machines", uiDirty = true, lastPanel = "", pointerDown = false, modalOpen = false;
+  var S, T = 0, tab = "orders", uiDirty = true, lastPanel = "", pointerDown = false, modalOpen = false;
   var floats = [], parts = [], belt = [], fxParts = [];
   var R3 = null, frameDt = 0.016;
   function fire(kind, d) { if (R3) try { R3.fx(kind, d); } catch (e) {} }
@@ -26,15 +27,32 @@
       x: 300 + (i % 3) * 10, y: ROWS[0] + 40, tx: null, ty: null, st: "idle", carry: null, tgt: null, walk: 0 };
   }
   function fresh() {
-    var s = { v: 1, level: 1, coins: 100, raw: { wood: 12, steel: 0 }, goods: { toy: 0, chair: 0, bucket: 0 },
+    var s = { v: 1, level: 1, coins: 100, raw: { wood: 12 }, goods: {},
       machines: [newMachine(0)], workers: [newWorker(0), newWorker(1)], space: 0, conveyor: false, vehicle: 0,
       orders: [], nextOrder: 3, seq: 1, deliveries: [], lv: freshLv(),
       stats: { produced: 0, wasted: 0, orders: 0, missed: 0, earned: 0, breakdowns: 0 },
       tut: 0, allDone: false, sound: true, pendingLevelUp: false, time: 0 };
     s.workers[0].job = 0;
+    return normalize(s);
+  }
+  // fills fields added after the first release so old saves keep working
+  function normalize(s) {
+    Object.keys(D.raws).forEach(function (k) { if (typeof s.raw[k] !== "number") s.raw[k] = 0; });
+    Object.keys(D.products).forEach(function (k) { if (typeof s.goods[k] !== "number") s.goods[k] = 0; });
+    if (s.fleet == null) s.fleet = 0;
+    if (!s.fac) s.fac = {};
+    if (s.plants == null) s.plants = 0;
+    if (s.hubs == null) s.hubs = 0;
+    if (s.plantT == null) s.plantT = 0;
+    if (s.premium == null) { try { s.premium = localStorage.getItem("gunvora_fk_tester_premium") === "1"; } catch (e) { s.premium = false; } }
+    if (s.gate == null) s.gate = false;
+    if (s.lv && s.lv.exports == null) s.lv.exports = 0;
+    if (s.stats && s.stats.exports == null) s.stats.exports = 0;
+    if (s.allDone && s.level < D.maxLevel && s.level >= 10 && !s.done250) { s.allDone = false; s.pendingLevelUp = true; }  // prototype "all done" at 10 → continue
+    (s.deliveries || []).forEach(function (d) { if (d.ex == null) d.ex = false; });
     return s;
   }
-  function freshLv() { return { orders: 0, earned: 0, produced: {}, total: 0 }; }
+  function freshLv() { return { orders: 0, earned: 0, produced: {}, total: 0, exports: 0 }; }
   function load() {
     try {
       var raw = localStorage.getItem(D.saveKey), migrated = false;
@@ -46,6 +64,7 @@
         (s.belt || []).forEach(function (b) { s.goods[b.p]++; }); delete s.belt;
         s.machines.forEach(function (m) { m.claim = null; m.fixer = null; });
         s.workers.forEach(function (w) { w.path = null; w.pk = null; w.shY = null; });
+        normalize(s);
         if (migrated) { try { localStorage.setItem(D.saveKey, JSON.stringify(s)); } catch (e) {} }
         return s;
       }
@@ -55,7 +74,11 @@
   function save() { try { var c = JSON.parse(JSON.stringify(S)); c.belt = belt.map(function (b) { return { p: b.p }; }); localStorage.setItem(D.saveKey, JSON.stringify(c)); } catch (e) {} }
 
   /* ---------------- helpers ---------------- */
-  function L() { return D.levels[Math.min(S.level, 10) - 1]; }
+  function L() { return D.levels[Math.min(S.level, D.maxLevel) - 1]; }
+  function fleetV() { return D.fleet[S.fleet]; }
+  function has(f) { return f === "conveyor" ? S.conveyor : !!S.fac[f]; }
+  function vehTime(v) { return v.time * (S.fac.autoDock ? 0.75 : 1); }
+  function passiveRate() { return (S.fac.solarRoof ? D.estReward(S.level) * 0.004 : 0) + S.hubs * D.estReward(S.level) * 0.003; }
   function space() { return D.spaces[S.space]; }
   function veh() { return D.vehicles[S.vehicle]; }
   function tierOf(m) { return D.tiers[m.tier]; }
@@ -63,8 +86,9 @@
   function unlockedProducts() { return Object.keys(D.products).filter(function (k) { return D.products[k].unlock <= S.level; }); }
   function unlockedRaws() { var r = {}; unlockedProducts().forEach(function (p) { r[D.products[p].raw] = 1; }); return Object.keys(r); }
   function cycleTime(m) { return D.products[m.product].time * tierOf(m).speed * (staffed(m) ? 1 : 1.3); }
-  function rawTotal() { return S.raw.wood + S.raw.steel; }
-  function goodsTotal() { return S.goods.toy + S.goods.chair + S.goods.bucket; }
+  function sumObj(o) { var t = 0; for (var k in o) t += o[k]; return t; }
+  function rawTotal() { return sumObj(S.raw); }
+  function goodsTotal() { return sumObj(S.goods); }
   function pending() {
     var n = belt.length;
     S.machines.forEach(function (m) { n += m.out.length + (m.cyc ? 1 : 0); });
@@ -106,7 +130,7 @@
   function toast(msg, cls) {
     var t = document.createElement("div"); t.className = "toast " + (cls || ""); t.textContent = msg;
     var box = $("toasts"); box.appendChild(t);
-    while (box.children.length > 3) box.removeChild(box.firstChild);
+    while (box.children.length > 2) box.removeChild(box.firstChild);
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2600);
   }
   function float(text, x, y, color) { floats.push({ t: text, x: x, y: y, y0: y, life: 1.2, c: color || "#fff" }); }
@@ -185,11 +209,48 @@
     ship: function (oid) {
       var o = S.orders.filter(function (x) { return x.id === oid; })[0]; if (!o) return false;
       if (S.goods[o.p] < o.q) return toast("Need " + (o.q - S.goods[o.p]) + " more " + D.products[o.p].name + "s", "bad");
-      if (S.deliveries.length >= veh().trips) return toast("Vehicle is out on a delivery", "bad");
+      var v = o.ex ? fleetV() : veh(), busy = S.deliveries.filter(function (d) { return d.ex === !!o.ex; });
+      if (o.ex && !S.fleet) return toast("Buy an export fleet first", "bad");
+      if (busy.length >= v.trips) return toast((o.ex ? "Export fleet" : "Vehicle") + " is out on a delivery", "bad");
       S.goods[o.p] -= o.q; S.orders.splice(S.orders.indexOf(o), 1);
-      var rew = Math.round(o.reward * (1 + veh().bonus)), used = S.deliveries.map(function (d) { return d.slot; });
-      S.deliveries.push({ id: o.id, cust: o.cust, p: o.p, q: o.q, reward: rew, t: 0, dur: veh().time, slot: used.indexOf(0) < 0 ? 0 : 1 });
-      sfx.tap(); toast("Shipped to " + o.cust + " 🚚", "good"); uiDirty = true; return true;
+      var rew = Math.round(o.reward * (1 + v.bonus) * (S.fac.printLine ? 1.15 : 1)), used = busy.map(function (d) { return d.slot; }), slot = 0;
+      while (used.indexOf(slot) >= 0) slot++;
+      S.deliveries.push({ id: o.id, cust: o.cust, p: o.p, q: o.q, reward: rew, t: 0, dur: vehTime(v), slot: slot, ex: !!o.ex, kind: o.ex ? S.fleet : S.vehicle });
+      sfx.tap(); toast((o.ex ? "Exported to " : "Shipped to ") + o.cust + (o.ex ? [" 🚆", " 🚆", " 🚢", " ✈️"][S.fleet] : " 🚚"), "good"); fire("ship", { ex: !!o.ex }); uiDirty = true; return true;
+    },
+    sell: function (p, n) {   // clear surplus stock to a wholesaler at a discount
+      n = Math.min(n || S.goods[p], S.goods[p]); if (n <= 0) return false;
+      var c = Math.round(n * D.products[p].value * D.sellRate);
+      S.goods[p] -= n; S.coins += c; S.stats.earned += c; sfx.coin(); bumpCoins(); toast("Sold " + n + "× " + D.products[p].name + " wholesale · +" + fmt(c), "good"); fire("coins", { x: SHELF_X, y: 200, n: 5 }); uiDirty = true; return true;
+    },
+    fleet: function () {
+      var n = D.fleet[S.fleet + 1]; if (!n) return false;
+      if (n.unlock > S.level) return toast(n.name + " unlocks at Level " + n.unlock, "bad");
+      if (S.coins < n.cost) return toast("Not enough coins", "bad");
+      S.coins -= n.cost; S.fleet++; sfx.level(); fire("celebrate", { k: "fleet" }); toast(n.name + " ready for export orders!", "good"); uiDirty = true; return true;
+    },
+    facility: function (k) {
+      var f = D.facilities[k]; if (!f || S.fac[k]) return false;
+      if (f.unlock > S.level) return toast(f.name + " unlocks at Level " + f.unlock, "bad");
+      if (S.coins < f.cost) return toast("Not enough coins", "bad");
+      S.coins -= f.cost; S.fac[k] = true; sfx.level(); fire("build", { k: k }); toast(f.name + " built!", "good"); uiDirty = true; return true;
+    },
+    plant: function () {
+      if (D.plants.unlock > S.level) return toast("Satellite factories unlock at Level " + D.plants.unlock, "bad");
+      if (S.plants >= D.plants.max) return false;
+      var c = D.plants.cost(S.plants); if (S.coins < c) return toast("Not enough coins", "bad");
+      S.coins -= c; S.plants++; sfx.level(); fire("build", { k: "plant" }); toast(D.plants.names[S.plants - 1] + " opened!", "good"); uiDirty = true; return true;
+    },
+    hub: function () {
+      if (D.hubs.unlock > S.level) return toast("Global hubs unlock at Level " + D.hubs.unlock, "bad");
+      if (S.hubs >= D.hubs.max) return false;
+      var c = D.hubs.cost(S.hubs); if (S.coins < c) return toast("Not enough coins", "bad");
+      S.coins -= c; S.hubs++; sfx.level(); fire("build", { k: "hub" }); toast(D.hubs.names[S.hubs - 1] + " opened!", "good"); uiDirty = true; return true;
+    },
+    premium: function (on) {
+      S.premium = !!on; try { localStorage.setItem("gunvora_fk_tester_premium", on ? "1" : "0"); } catch (e) {}
+      if (on && S.gate) { S.gate = false; S.level++; S.lv = freshLv(); S.nextOrder = Math.min(S.nextOrder, 3); toast("Premium unlocked (tester) · Level " + S.level, "good"); }
+      uiDirty = true; save(); return true;
     }
   };
   function dropCarry(w) {
@@ -199,14 +260,18 @@
 
   /* ---------------- simulation ---------------- */
   function genOrder() {
-    var ps = unlockedProducts();
-    var p = ps.length > 1 && Math.random() < 0.55 ? ps[ps.length - 1] : ps[ri(0, ps.length - 1)];
-    var P = D.products[p], n = S.level;
-    var q = ri(2, 3 + Math.floor(n / 3)); if (P.time >= 5.5) q = Math.max(2, q - 1);
-    var est = q * P.time / Math.max(1, S.machines.length * 0.6);
-    var dl = Math.round(est * 2.2 + 40);
-    S.orders.push({ id: S.seq++, cust: CUSTOMERS[ri(0, CUSTOMERS.length - 1)], av: ri(0, AVATAR.length - 1), p: p, q: q,
-      reward: Math.round(q * P.value * (1 + 0.05 * (n - 1))), dl: dl, dl0: dl });
+    var n = S.level, ps = n <= 10 ? unlockedProducts() : D.demandAt(n);
+    var p = ps.length > 1 && Math.random() < 0.45 ? ps[ps.length - 1] : ps[ri(0, ps.length - 1)];
+    var P = D.products[p];
+    var q = ri(2, D.orderQtyMax(n)); if (P.time >= 5.5) q = Math.max(2, q - 1);
+    var ex = S.fleet > 0 && S.orders.filter(function (o) { return o.ex; }).length < 2 && Math.random() < 0.4;
+    if (ex) q = Math.round(q * 1.6);
+    var spd = 0; S.machines.forEach(function (m) { spd += 1 / D.tiers[m.tier].speed; });
+    var est = q * P.time / Math.max(1, spd * 0.6);
+    var dl = Math.round(est * 2.2 + 40) * (ex ? 1.8 : 1);
+    var rew = q * P.value * D.levelMult(n) * (ex ? 2.2 * (1 + 0.1 * S.hubs) : 1);
+    S.orders.push({ id: S.seq++, cust: ex ? EXPORTERS[ri(0, EXPORTERS.length - 1)] : CUSTOMERS[ri(0, CUSTOMERS.length - 1)], av: ri(0, AVATAR.length - 1), p: p, q: q,
+      reward: Math.round(rew), dl: Math.round(dl), dl0: Math.round(dl), ex: ex });
     uiDirty = true;
   }
 
@@ -222,10 +287,20 @@
       var d = S.deliveries[i]; d.t += dt;
       if (d.t >= d.dur) {
         S.deliveries.splice(i, 1); S.coins += d.reward; S.lv.earned += d.reward; S.lv.orders++; S.stats.orders++; S.stats.earned += d.reward;
-        float("+" + d.reward, DOCK_X, ROAD_Y - 30, "#fde68a"); coinFly(DOCK_X, ROAD_Y - 10, 8); sfx.coin(); bumpCoins();
+        if (d.ex) { S.lv.exports++; S.stats.exports++; }
+        float("+" + fmt(d.reward), DOCK_X, ROAD_Y - 30, "#fde68a"); if (R3) fire("coins", { x: DOCK_X, y: ROAD_Y - 10, n: 10, ex: d.ex }); else coinFly(DOCK_X, ROAD_Y - 10, 8); sfx.coin(); bumpCoins();
         toast("💰 " + d.cust + " paid " + d.reward + " coins", "good"); uiDirty = true;
       }
     }
+    if (S.plants) {   // satellite factories send finished goods by shuttle
+      S.plantT += dt * S.plants;
+      while (S.plantT >= D.plants.every) {
+        S.plantT -= D.plants.every;
+        var dm = D.demandAt(S.level), pp = dm[ri(0, dm.length - 1)];
+        if (goodsTotal() + pending() < space().goods) { S.goods[pp]++; S.lv.produced[pp] = (S.lv.produced[pp] || 0) + 1; S.lv.total++; S.stats.produced++; fire("plant", { p: pp }); uiDirty = true; }
+      }
+    }
+    var pr = passiveRate(); if (pr) { S.coins += pr * dt; }
     S.machines.forEach(function (m) {
       var tr = tierOf(m), P = D.products[m.product], op = staffed(m);
       if (m.shake > 0) m.shake -= dt;
@@ -254,6 +329,7 @@
   }
   function canStart(m) {
     var P = D.products[m.product];
+    if (P.needs && !has(P.needs)) return false;
     if (S.raw[P.raw] < P.rawQty) return false;
     if (!S.conveyor && m.out.length >= 3) return false;
     if (goodsTotal() + pending() >= space().goods) return false;
@@ -263,6 +339,7 @@
     var P = D.products[m.product];
     if (m.broken) return m.repair > 0 ? "Repairing…" : "Broken! Tap to repair";
     if (m.cyc) return "Making " + P.name;
+    if (P.needs && !has(P.needs)) return "Needs the " + D.facilities[P.needs].name;
     if (S.raw[P.raw] < P.rawQty) return "No " + D.raws[P.raw].name.toLowerCase() + "! Buy in Inventory";
     if (!S.conveyor && m.out.length >= 3) return "Output tray full, needs a carrier";
     if (goodsTotal() + pending() >= space().goods) return "Shelf full, ship some orders";
@@ -280,12 +357,12 @@
     if (Math.random() < q) {
       if (S.conveyor) belt.push({ p: m.product, x: x + 30, y: y + 28 }); else m.out.push(m.product);
       S.lv.produced[m.product] = (S.lv.produced[m.product] || 0) + 1; S.lv.total++; S.stats.produced++;
-      float("+1 " + P.name, x, y - 40, "#fff"); sfx.made(); fire("finish", { id: m.id, ok: true });
+      if (!R3 || S.machines.length <= 3) float("+1 " + P.name, x, y - 40, "#fff"); else if (Math.random() < 0.25) float("+1 " + P.icon, x, y - 40, "#fff"); sfx.made(); fire("finish", { id: m.id, ok: true });
     } else {
       S.stats.wasted++; float("✖ scrap", x, y - 40, "#fca5a5"); fire("finish", { id: m.id, ok: false });
       for (var i = 0; i < 6; i++) parts.push({ x: x, y: y - 10, vx: rnd(-40, 40), vy: -rnd(30, 70), life: 0.6, k: "scrap" });
     }
-    m.cond = Math.max(0, m.cond - tr.wear * rnd(0.8, 1.2));
+    m.cond = Math.max(0, m.cond - tr.wear * rnd(0.8, 1.2) * (S.fac.smart ? 0.5 : 1));
     if (m.cond < 45 && Math.random() < (45 - m.cond) / 45 * 0.5 || m.cond <= 0) {
       m.broken = true; m.shake = 0.6; S.stats.breakdowns++; sfx.bad(); fire("break", { id: m.id });
       toast("💥 M" + (m.id + 1) + " broke down! Tap it to repair", "bad");
@@ -325,7 +402,7 @@
   function walkTo(w, x, y, dt) {
     var key = x + "," + y + "," + S.machines.length;
     if (w.pk !== key || !w.path) { w.path = plan(w.x, w.y, x, y); w.pk = key; }
-    var sp = WALK * dt;
+    var sp = WALK * dt * (S.fac.agv ? 1.7 : 1);
     while (w.path.length) {
       var t = w.path[0], dx = t[0] - w.x, dy = t[1] - w.y, d = Math.sqrt(dx * dx + dy * dy);
       if (d <= sp) { w.x = t[0]; w.y = t[1]; sp -= d; w.path.shift(); if (d > 0) w.moving = true; continue; }
@@ -394,6 +471,11 @@
       case "space": return [S.space + 1 >= g.n ? 1 : 0, 1];
       case "conveyor": return [S.conveyor ? 1 : 0, 1];
       case "vehicle": return [S.vehicle + 1 >= g.n ? 1 : 0, 1];
+      case "fleet": return [S.fleet >= g.n ? 1 : 0, 1];
+      case "facility": return [S.fac[g.f] ? 1 : 0, 1];
+      case "plants": return [Math.min(S.plants, g.n), g.n];
+      case "hubs": return [Math.min(S.hubs, g.n), g.n];
+      case "export": return [S.lv.exports, g.n];
     }
     return [0, 1];
   }
@@ -409,6 +491,11 @@
       case "space": return "🏗️ Expand to " + D.spaces[g.n - 1].name;
       case "conveyor": return "➡️ Build conveyor belts";
       case "vehicle": return "🚚 Buy the " + D.vehicles[g.n - 1].name;
+      case "fleet": return ["", "🚆", "🚢", "✈️"][g.n] + " Get a " + D.fleet[g.n].name;
+      case "facility": return "🏗️ Build " + D.facilities[g.f].name;
+      case "plants": return "🏭 Open " + g.n + " satellite factor" + (g.n > 1 ? "ies" : "y") + " (" + c + ")";
+      case "hubs": return "🌍 Open " + g.n + " global hub" + (g.n > 1 ? "s" : "") + " (" + c + ")";
+      case "export": return "🌐 Export orders " + c + "/" + g.n;
     }
   }
   function levelPct() {
@@ -417,7 +504,7 @@
     return s / g.length;
   }
   function checkLevel() {
-    if (S.allDone || S.pendingLevelUp || (S.tut >= 0 && S.tut < 2)) return;
+    if (S.allDone || S.gate || S.pendingLevelUp || (S.tut >= 0 && S.tut < 2)) return;
     if (levelPct() >= 1) {
       S.pendingLevelUp = true; S.coins += L().reward; uiDirty = true;
       if (!window.FK || !window.FK.headless) setTimeout(showLevelUp, 300);
@@ -426,7 +513,8 @@
   function advanceLevel() {
     if (!S.pendingLevelUp) return;
     S.pendingLevelUp = false;
-    if (S.level >= 10) { S.allDone = true; save(); uiDirty = true; return; }
+    if (S.level >= D.maxLevel) { S.allDone = true; S.done250 = true; save(); uiDirty = true; return; }
+    if (S.level === D.freeLevels && !S.premium) { S.gate = true; save(); uiDirty = true; return; }
     S.level++; S.lv = freshLv(); S.nextOrder = Math.min(S.nextOrder, 3); uiDirty = true; save();
     var nl = L(); toast("Level " + nl.n + " · " + nl.title, "good");
   }
@@ -440,6 +528,7 @@
     cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
     scale = Math.min(r.width / W, r.height / H); ox = (r.width - W * scale) / 2; oy = (r.height - H * scale) / 2;
     var a = $("app").getBoundingClientRect(); fxc.width = Math.round(a.width * dpr); fxc.height = Math.round(a.height * dpr);
+    var ds = document.documentElement.style; ds.setProperty("--barH", $("bar").offsetHeight + "px"); ds.setProperty("--hudH", $("hud").offsetHeight + "px");
     uiDirty = true;
   }
   function rr(x, y, w, h, r) { cx.beginPath(); cx.moveTo(x + r, y); cx.arcTo(x + w, y, x + w, y + h, r); cx.arcTo(x + w, y + h, x, y + h, r); cx.arcTo(x, y + h, x, y, r); cx.arcTo(x, y, x + w, y, r); cx.closePath(); }
@@ -463,7 +552,7 @@
     } else if (p === "bucket") {
       cx.fillStyle = "#94a3b8"; cx.beginPath(); cx.moveTo(-8, -6); cx.lineTo(8, -6); cx.lineTo(6, 7); cx.lineTo(-6, 7); cx.closePath(); cx.fill();
       cx.fillStyle = "#cbd5e1"; cx.fillRect(-8, -7, 16, 3); cx.strokeStyle = "#475569"; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(0, -6, 7, Math.PI, 0); cx.stroke();
-    } else { fillRR(-7, -7, 14, 14, 2, "#a16207"); }
+    } else { var PI_ = D.products[p]; cx.textAlign = "center"; cx.textBaseline = "middle"; cx.font = "14px system-ui,'Segoe UI Emoji','Noto Color Emoji',sans-serif"; cx.fillText(PI_ ? PI_.icon : "📦", 0, 0); }
     cx.restore();
   }
   function drawBox(x, y, c) { fillRR(x - 6, y - 6, 12, 10, 2, c || "#d4a373"); cx.fillStyle = "rgba(0,0,0,.18)"; cx.fillRect(x - 6, y - 3, 12, 2); }
@@ -485,25 +574,25 @@
       rr(14, by + 8, 272, ROAD_Y - 34 - by - 8, 10); cx.stroke(); cx.setLineDash([]);
       txt("🔒 Workshop expansion · Level " + D.spaces[1].unlock, 150, by + (ROAD_Y - 34 - by) / 2 + 8, 11, "rgba(255,255,255,.95)");
     }
-    var wall = sp === 0 ? "#a16207" : sp === 1 ? "#b45309" : "#475569";
+    var wall = ["#a16207", "#b45309", "#475569", "#7f1d1d", "#1e3a5f", "#334155", "#1f2937", "#111827"][Math.min(sp, 7)];
     var floor = sp === 0 ? "#e7c89b" : sp === 1 ? "#d6dbe3" : "#e2e8f0";
     fillRR(10, 56, 382, by - 56 + 4, 8, shade(wall, -0.35));
     cx.fillStyle = floor; cx.fillRect(18, 96, 366, by - 96 - 2);
     cx.strokeStyle = sp === 0 ? "rgba(146,64,14,.18)" : "rgba(71,85,105,.14)"; cx.lineWidth = 1;
     if (sp === 0) { for (py = 104; py < by; py += 12) { cx.beginPath(); cx.moveTo(18, py); cx.lineTo(384, py); cx.stroke(); } }
     else { for (px = 18; px < 384; px += 30) { cx.beginPath(); cx.moveTo(px, 96); cx.lineTo(px, by - 2); cx.stroke(); } for (py = 96; py < by; py += 30) { cx.beginPath(); cx.moveTo(18, py); cx.lineTo(384, py); cx.stroke(); } }
-    if (sp === 2) { cx.fillStyle = "#facc15"; cx.fillRect(66, ROWS[0] + 44, 252, 2); cx.fillRect(66, ROWS[1] + 44, 252, 2); }
+    if (sp >= 2) { cx.fillStyle = "#facc15"; cx.fillRect(66, ROWS[0] + 44, 252, 2); cx.fillRect(66, ROWS[1] + 44, 252, 2); }
     cx.fillStyle = wall; cx.fillRect(18, 62, 366, 34);
     if (sp === 0) { cx.strokeStyle = "rgba(0,0,0,.18)"; for (px = 18; px < 384; px += 14) { cx.beginPath(); cx.moveTo(px, 62); cx.lineTo(px, 96); cx.stroke(); } }
     if (sp === 1) { cx.fillStyle = "rgba(255,255,255,.14)"; for (py = 62; py < 96; py += 8) for (px = 18 + ((py / 8) % 2 ? 10 : 0); px < 380; px += 20) cx.fillRect(px, py, 18, 6); }
-    if (sp === 2) { cx.fillStyle = "rgba(255,255,255,.08)"; for (px = 18; px < 384; px += 24) cx.fillRect(px, 62, 2, 34); }
+    if (sp >= 2) { cx.fillStyle = "rgba(255,255,255,.08)"; for (px = 18; px < 384; px += 24) cx.fillRect(px, 62, 2, 34); }
     var wins = sp === 0 ? [50, 300] : sp === 1 ? [40, 110, 260, 330] : [30, 90, 270, 330];
     wins.forEach(function (wx) { fillRR(wx, 68, 34, 20, 3, "#1e3a8a"); fillRR(wx + 2, 70, 30, 16, 2, "#93c5fd"); cx.fillStyle = "rgba(255,255,255,.55)"; cx.beginPath(); cx.moveTo(wx + 6, 86); cx.lineTo(wx + 14, 70); cx.lineTo(wx + 19, 70); cx.lineTo(wx + 11, 86); cx.fill(); });
-    var sw = sp === 2 ? 130 : 110; fillRR(200 - sw / 2, 64, sw, 27, 6, sp === 2 ? "#4338ca" : "#1f2937");
-    txt(sp === 2 ? "FACTORY KINGDOM" : space().name.toUpperCase(), 200, 76, 9, sp === 2 ? "#fff" : "#fde68a");
-    txt(sp === 2 ? "GUNVORA GAMES" : "LEVEL " + S.level + " · " + L().title.toUpperCase(), 200, 86, 6.5, "#fdba74");
+    var sw = sp >= 2 ? 130 : 110; fillRR(200 - sw / 2, 64, sw, 27, 6, sp >= 2 ? "#4338ca" : "#1f2937");
+    txt(sp >= 2 ? space().name.toUpperCase() : space().name.toUpperCase(), 200, 76, 9, sp >= 2 ? "#fff" : "#fde68a");
+    txt(sp >= 2 ? "GUNVORA GAMES" : "LEVEL " + S.level + " · " + L().title.toUpperCase(), 200, 86, 6.5, "#fdba74");
     fillRR(6, 50, 390, 12, 5, shade(wall, -0.5));
-    if (sp === 2) for (i = 0; i < 4; i++) fillRR(40 + i * 90, 46, 50, 8, 3, "#93c5fd");
+    if (sp >= 2) for (i = 0; i < 4; i++) fillRR(40 + i * 90, 46, 50, 8, 3, "#93c5fd");
     if (sp >= 1) { // chimney with smoke
       fillRR(360, 26, 16, 30, 2, "#7f1d1d"); if (Math.random() < 0.08) parts.push({ x: 368, y: 24, vx: rnd(4, 10), vy: -rnd(10, 18), life: 2, k: "smoke", r: rnd(3, 5) });
     }
@@ -699,10 +788,12 @@
     return { x: r.left - a.left + ox + x * scale, y: r.top - a.top + oy + y * scale };
   }
   function coinFly(x, y, n) {
+    if (R3) { fire("coins", { x: x, y: y, n: n }); setTimeout(bumpCoins, 700); return; }
     var p = sceneToApp(x, y), a = $("app").getBoundingClientRect(), t = $("sCoins").getBoundingClientRect();
     for (var i = 0; i < n; i++) fxParts.push({ k: "coin", sx: p.x + rnd(-12, 12), sy: p.y + rnd(-8, 8), tx: t.left - a.left + 10, ty: t.top - a.top + 10, t: -i * 0.06, d: 0.75 });
   }
   function confetti(n) {
+    if (R3) { fire("celebrate", { n: n }); return; }
     var a = $("app").getBoundingClientRect();
     for (var i = 0; i < n; i++) fxParts.push({ k: "conf", x: rnd(0, a.width), y: rnd(-80, -10), vx: rnd(-40, 40), vy: rnd(80, 200), r: rnd(0, 6), vr: rnd(-6, 6), c: ["#f97316", "#4f46e5", "#facc15", "#10b981", "#ec4899", "#38bdf8"][i % 6], life: rnd(2.5, 4) });
   }
@@ -745,22 +836,26 @@
     for (i = 0; i < S.machines.length; i++) {
       s = SLOTS[i]; if (Math.abs(x - s.x) < 38 && y > s.y - 72 && y < s.y + 34) { tapMachine(S.machines[i]); return; }
     }
-    for (i = S.machines.length; i < 6; i++) { s = SLOTS[i]; if (Math.abs(x - s.x) < 32 && Math.abs(y - s.y + 5) < 28) { setTab(i < space().slots ? "machines" : "upgrade"); return; } }
-    if (x > SHELF_X - 6 && y > 88 && y < bottomY()) { setTab("orders"); return; }
-    if (x < 66 && y > 96 && y < bottomY()) { setTab("inventory"); return; }
-    if (y > ROAD_Y - 40) { setTab("delivery"); return; }
-    if (S.space === 0 && y > bottomY()) setTab("upgrade");
+    for (i = S.machines.length; i < 6; i++) { s = SLOTS[i]; if (Math.abs(x - s.x) < 32 && Math.abs(y - s.y + 5) < 28) { closePop(); setTab(i < space().slots ? "machines" : "upgrade", true); return; } }
+    if (x > SHELF_X - 6 && y > 88 && y < bottomY()) { closePop(); setTab("orders", true); return; }
+    if (x < 66 && y > 96 && y < bottomY()) { closePop(); setTab("inventory", true); return; }
+    if (y > ROAD_Y - 40) { closePop(); setTab("delivery", true); return; }
+    if (S.space === 0 && y > bottomY()) setTab("upgrade", true); else closePop();
   });
   function tap3d(h) {
-    if (!h) return;
+    if (!h) { closePop(); return; }
     if (h.k === "machine" && S.machines[h.id]) { userGestured = true; tapMachine(S.machines[h.id]); return; }
     if (h.k === "slot") { setTab(h.i < space().slots ? "machines" : "upgrade"); return; }
-    if (h.k === "shelf") { setTab("orders"); return; }
-    if (h.k === "raw") { setTab("inventory"); return; }
-    if (h.k === "road") { setTab("delivery"); return; }
-    if (h.k === "yard") { setTab("upgrade"); return; }
+    if (h.k === "shelf") { closePop(); setTab("orders", true); return; }
+    if (h.k === "raw") { closePop(); setTab("inventory", true); return; }
+    if (h.k === "road") { closePop(); setTab("delivery", true); return; }
+    if (h.k === "yard") { closePop(); setTab("upgrade", true); return; }
   }
-  function tapMachine(m) {
+  function tapMachine(m, fromPop) {
+    if (!fromPop) { tapMachineAct(m); if (!(S.tut >= 0 && S.tut < 2 && S.level === 1)) openPop(m.id); return; }
+    tapMachineAct(m);
+  }
+  function tapMachineAct(m) {
     var s = SLOTS[m.id], i;
     if (m.broken) { if (m.repair <= 0) A.repair(m.id); else toast("Repair in progress…"); return; }
     if (m.cyc) {
@@ -774,28 +869,63 @@
       return;
     }
     if (!m.on) { m.on = true; sfx.buy(); float("ON!", s.x, s.y - 40, "#86efac"); uiDirty = true; tutCheck(); return; }
-    toast("M" + (m.id + 1) + ": " + blockReason(m), "bad");
+    if (popId !== m.id) toast("M" + (m.id + 1) + ": " + blockReason(m), "bad");
   }
 
-  /* ---------------- HUD & panel ---------------- */
+  /* ---------------- HUD, status line, goals ---------------- */
+  var goalsOpen = false, goalsAuto = 0, lastStatus = "";
   function hud() {
-    var l = L();
-    var lt = "Level " + l.n + " · " + l.title + (S.allDone ? " ✓" : "") + " <span>▾ map</span>";
-    if ($("lvlTitle").innerHTML !== lt) $("lvlTitle").innerHTML = lt;
-    $("sCoins").innerHTML = '<i class="coin"></i>' + fmt(S.coins);
-    $("sWorkers").textContent = S.workers.length + " / " + space().workers;
-    $("sOrders").textContent = S.orders.length + " / " + l.maxOrders;
+    var l = L(), prem = l.n > D.freeLevels;
+    $("lvlNum").textContent = l.n; $("lvlNum").classList.toggle("prem", prem);
+    var nm = l.title + (S.allDone ? " ✓" : "");
+    if ($("lvlName").textContent !== nm) $("lvlName").textContent = nm;
+    $("sCoins").textContent = fmtShort(S.coins);
+    $("sWorkers").textContent = S.workers.length + "/" + space().workers;
+    $("sOrders").textContent = S.orders.length + "/" + l.maxOrders;
     var pct = Math.round(levelPct() * 100); $("sPct").textContent = pct + "%"; $("sBar").style.width = pct + "%";
-    var gh = S.allDone ? '<span class="goal done">🏆 Levels 1–10 complete! Keep growing your factory</span>' :
+    var done = 0; l.goals.forEach(function (g) { var p = goalProg(g); if (p[0] >= p[1]) done++; });
+    var sum = S.allDone ? "All 250 levels complete!" : S.gate ? "Free levels complete" : done + "/" + l.goals.length + " goals";
+    if ($("goalsSum").textContent !== sum) $("goalsSum").textContent = sum;
+    var gh = S.allDone ? '<span class="goal done">🏆 Industrial Emperor! Keep growing your empire</span>' :
+      S.gate ? '<span class="goal done">👑 Levels 1–50 complete · Premium continues at 51</span>' :
       l.goals.map(function (g) { var p = goalProg(g); return '<span class="goal' + (p[0] >= p[1] ? " done" : "") + '">' + (p[0] >= p[1] ? "✅ " : "") + goalLabel(g) + "</span>"; }).join("");
     if ($("goals").innerHTML !== gh) $("goals").innerHTML = gh;
+    $("goalsBox").classList.toggle("open", goalsOpen || goalsAuto > T);
     var ready = S.orders.filter(function (o) { return S.goods[o.p] >= o.q; }).length;
     $("ordBadge").textContent = S.orders.length ? (ready ? "✓" + ready : S.orders.length) : "";
-    document.querySelector('#tabs [data-tab="orders"]').classList.toggle("pulse", ready > 0 && tab !== "orders" && S.deliveries.length < veh().trips);
+    document.querySelector('#tabs [data-tab="orders"]').classList.toggle("pulse", ready > 0 && !(sheetOpen && tab === "orders") && S.deliveries.filter(function (d) { return !d.ex; }).length < veh().trips);
+    status();
+    renderPop();
   }
+  function fmtShort(n) {
+    n = Math.floor(n);
+    if (n < 100000) return n.toLocaleString("en-IN");
+    var u = [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]];
+    for (var i = 0; i < u.length; i++) if (n >= u[i][0]) { var v = n / u[i][0]; return (v >= 100 ? Math.round(v) : v.toFixed(1).replace(/\.0$/, "")) + u[i][1]; }
+    return String(n);
+  }
+  // one-line status: the most useful thing to know right now (tap it to jump to the right tab)
+  function status() {
+    var st = null, i;
+    for (i = 0; i < S.machines.length && !st; i++) { var m = S.machines[i]; if (m.broken) st = ["bad", "💥 M" + (m.id + 1) + (m.repair > 0 ? " repairing…" : " broke down · tap it to repair"), "machines"]; }
+    if (!st && S.gate) st = ["warn", "👑 Levels 51–250 are Premium · open Menu → Tester unlock", "menu"];
+    var ready = S.orders.filter(function (o) { return S.goods[o.p] >= o.q; });
+    if (!st && ready.length) st = ["", "✅ " + ready.length + " order" + (ready.length > 1 ? "s" : "") + " ready to ship · tap to open Orders", "orders"];
+    if (!st) for (i = 0; i < S.machines.length && !st; i++) { var mm = S.machines[i], P = D.products[mm.product]; if (!mm.cyc && S.raw[P.raw] < P.rawQty) st = ["warn", "🪵 Out of " + D.raws[P.raw].name.toLowerCase() + " · buy more in Inventory", "inventory"]; }
+    if (!st && goodsTotal() + pending() >= space().goods) st = ["warn", "📦 Shelf full · ship orders or sell surplus", "inventory"];
+    if (!st && S.deliveries.length) { var d = S.deliveries[0]; st = ["", (d.ex ? "🌐 Exporting to " : "🚚 Delivering to ") + d.cust + " · " + Math.round(d.t / d.dur * 100) + "%", "delivery"]; }
+    if (!st) { var run = S.machines.filter(function (m) { return m.cyc; }).length; st = ["", "⚙️ " + run + "/" + S.machines.length + " machines running · " + S.orders.length + " open order" + (S.orders.length === 1 ? "" : "s"), "machines"]; }
+    var k = st.join("|"); if (k === lastStatus) return; lastStatus = k;
+    $("status").className = "status " + st[0]; $("statusTxt").textContent = st[1]; $("status").dataset.go = st[2];
+  }
+  $("status").addEventListener("click", function () { var g = $("status").dataset.go; if (g === "menu") menu(); else if (g) setTab(g); });
+  $("goalsTgl").addEventListener("click", function () { goalsOpen = !(goalsOpen || goalsAuto > T); goalsAuto = 0; sfx.tap(); hud(); });
+
   function btn(act, label, cls, dis, arg) { return '<button class="btn ' + (cls || "") + '" data-act="' + act + '"' + (arg != null ? ' data-arg="' + arg + '"' : "") + (dis ? " disabled" : "") + ">" + label + "</button>"; }
-  function coinTxt(n) { return fmt(n) + " 🪙"; }
-  function locked(lv) { return '<span class="chip warn">🔒 Level ' + lv + "</span>"; }
+  function coinTxt(n) { return fmtShort(n) + " 🪙"; }
+  function locked(lv) { return '<span class="chip warn">🔒 Lv ' + lv + (lv > D.freeLevels ? " 👑" : "") + "</span>"; }
+  function card(icon, title, sub, right, cls) { return '<div class="card' + (cls ? " " + cls : "") + '"><div class="row"><div class="icon">' + icon + '</div><div class="grow"><div class="ttl">' + title + '</div><div class="sub">' + sub + "</div></div>" + (right || "") + "</div></div>"; }
+  var OWNED = '<span class="chip ok">OWNED</span>';
 
   var PANELS = {
     machines: function () {
@@ -804,18 +934,17 @@
         var tr = tierOf(m), op = staffed(m), nt = D.tiers[m.tier + 1];
         var st = blockReason(m), stc = m.broken ? "bad" : m.cyc ? "ok" : "warn";
         h += '<div class="card"><div class="row"><div class="icon" style="background:' + tr.color + ';color:#fff">⚙️</div><div class="grow"><div class="ttl">M' + (m.id + 1) + " · " + tr.name + ' <span class="chip">' + tr.short + '</span></div><div class="sub">' + (op ? "Operator: " + op.name : "No operator (tap machine to run once)") + "</div></div>" +
-          '<select class="sel" data-act="product" data-arg="' + m.id + '">' + unlockedProducts().map(function (p) { return '<option value="' + p + '"' + (p === m.product ? " selected" : "") + ">" + D.products[p].icon + " " + D.products[p].name + "</option>"; }).join("") + "</select></div>" +
-          '<div class="chips"><span class="chip ' + stc + '">' + st + '</span><span class="chip">⏱ Speed ' + cycleTime(m).toFixed(1) + 's/unit</span><span class="chip">✨ Quality ' + Math.round(tr.quality * 100) + '%</span><span class="chip">🗑 Waste ' + Math.round((1 - tr.quality) * 100) + '%</span><span class="chip ' + (m.cond < 40 ? "bad" : m.cond < 70 ? "warn" : "ok") + '">🔧 Condition ' + Math.round(m.cond) + "%</span></div>" +
+          prodSelect(m) + "</div>" +
+          '<div class="chips"><span class="chip ' + stc + '">' + st + '</span><span class="chip">⏱ ' + cycleTime(m).toFixed(1) + 's/unit</span><span class="chip">✨ ' + (tr.quality * 100).toFixed(tr.quality > 0.99 ? 1 : 0) + '%</span><span class="chip ' + (m.cond < 40 ? "bad" : m.cond < 70 ? "warn" : "ok") + '">🔧 ' + Math.round(m.cond) + "%</span></div>" +
           '<div class="mini-bar"><i style="width:' + m.cond + "%;background:" + (m.cond > 60 ? "#38bdf8" : m.cond > 35 ? "#f59e0b" : "#ef4444") + '"></i></div><div class="btns">' +
           (m.broken ? btn("repair", m.repair > 0 ? "Repairing… " + Math.ceil(m.repair) + "s" : "🔧 Repair · " + coinTxt(D.repairCost), "red", m.repair > 0, m.id) :
             btn("toggle", m.on ? "⏸ Stop" : "▶ Start", m.on ? "ghost" : "grn", false, m.id) + btn("service", "🛠 Service · " + coinTxt(D.serviceCost), "ghost", m.cond >= 99, m.id)) +
           (nt ? (nt.unlock > S.level ? '<span class="chip warn" style="align-self:center">🔒 ' + nt.short + " at Level " + nt.unlock + "</span>" : btn("upMachine", "⬆ " + nt.short + " · " + coinTxt(nt.upCost), "acc", S.coins < nt.upCost, m.id)) : '<span class="chip ok" style="align-self:center">MAX TIER</span>') + "</div></div>";
       });
       var full = S.machines.length >= space().slots;
-      h += '<div class="card' + (S.level < 3 ? " lock" : "") + '"><div class="row"><div class="icon">➕</div><div class="grow"><div class="ttl">Buy a new machine</div><div class="sub">' +
-        (S.level < 3 ? "Unlocks at Level 3" : full ? "All slots used. Expand your space in Upgrade" : "Basic Press (T1) · gets a spare worker if you have one") + "</div></div>" +
-        (S.level < 3 ? locked(3) : btn("buyMachine", coinTxt(machineCost()), "acc", full || S.coins < machineCost())) + "</div></div>";
-      h += '<p class="sub" style="padding:0 4px">Tip: tap a running machine in the factory to speed it up ⚡. Worn machines make more scrap and can break down, so service them or let spare workers maintain them.</p>';
+      h += card("➕", "Buy a new machine", S.level < 3 ? "Unlocks at Level 3" : full ? "All slots used. Expand your site in Upgrade" : "Basic Press (T1) · gets a spare worker if you have one",
+        S.level < 3 ? locked(3) : btn("buyMachine", coinTxt(machineCost()), "acc", full || S.coins < machineCost()), S.level < 3 ? "lock" : "");
+      h += '<p class="sub" style="padding:0 4px">Tip: tap a machine in the factory for quick actions. Tapping a running machine speeds it up ⚡.</p>';
       return h;
     },
     workers: function () {
@@ -828,75 +957,117 @@
           S.machines.map(function (m) { return '<option value="' + m.id + '"' + (w.job === m.id ? " selected" : "") + ">⚙️ Operate M" + (m.id + 1) + "</option>"; }).join("") + "</select></div></div>";
       });
       var full = S.workers.length >= space().workers;
-      h += '<div class="card' + (S.level < 2 ? " lock" : "") + '"><div class="row"><div class="icon">🧑‍🏭</div><div class="grow"><div class="ttl">Hire a worker</div><div class="sub">' + (S.level < 2 ? "Unlocks at Level 2" : full ? "No room. Expand your space" : "Joins an idle machine, or carries goods") + "</div></div>" +
-        (S.level < 2 ? locked(2) : btn("hire", coinTxt(hireCost()), "acc", full || S.coins < hireCost())) + "</div></div>";
-      h += '<p class="sub" style="padding:0 4px">Operators run machines non-stop. ' + (S.conveyor ? "With conveyors, spare workers are helpers who service and repair machines for free." : "Carriers move finished goods from machine trays to the shelf and service worn machines when free.") + "</p>";
+      h += card("🧑‍🏭", "Hire a worker", S.level < 2 ? "Unlocks at Level 2" : full ? "No room. Expand your site" : "Joins an idle machine, or carries goods",
+        S.level < 2 ? locked(2) : btn("hire", coinTxt(hireCost()), "acc", full || S.coins < hireCost()), S.level < 2 ? "lock" : "");
+      h += '<p class="sub" style="padding:0 4px">Operators run machines non-stop. ' + (S.conveyor ? "With conveyors, spare workers are helpers who service and repair machines for free." : "Carriers move finished goods from machine trays to the shelf and service worn machines when free.") + (S.fac.agv ? " AGVs speed up every walk by 70%." : "") + "</p>";
       return h;
     },
     delivery: function () {
-      var v = veh(), nv = D.vehicles[S.vehicle + 1];
-      var h = '<div class="ph"><h3>Delivery</h3><small>' + S.stats.orders + " delivered · " + S.stats.missed + " missed</small></div>";
-      h += '<div class="card"><div class="row"><div class="icon">' + (S.vehicle ? "🚚" : "🛒") + '</div><div class="grow"><div class="ttl">' + v.name + '</div><div class="sub">' + v.trips + " trip" + (v.trips > 1 ? "s" : "") + " at a time · " + v.time + "s round trip" + (v.bonus ? " · +" + Math.round(v.bonus * 100) + "% express bonus" : "") + "</div></div></div></div>";
+      var v = veh(), nv = D.vehicles[S.vehicle + 1], fv = fleetV(), nf = D.fleet[S.fleet + 1];
+      var h = '<div class="ph"><h3>Delivery</h3><small>' + fmt(S.stats.orders) + " delivered · " + fmt(S.stats.exports || 0) + " exported · " + S.stats.missed + " missed</small></div>";
+      h += card(S.vehicle ? "🚚" : "🛒", v.name, v.trips + " trip" + (v.trips > 1 ? "s" : "") + " at a time · " + vehTime(v).toFixed(1).replace(/\.0$/, "") + "s round trip" + (v.bonus ? " · +" + Math.round(v.bonus * 100) + "% express bonus" : ""));
+      if (S.fleet) h += card(["", "🚆", "🚢", "✈️"][S.fleet], fv.name + " · export", fv.trips + " shipment" + (fv.trips > 1 ? "s" : "") + " at a time · " + vehTime(fv).toFixed(1).replace(/\.0$/, "") + "s · +" + Math.round(fv.bonus * 100) + "% bonus");
       if (S.deliveries.length) S.deliveries.forEach(function (d) {
-        h += '<div class="card"><div class="row"><div class="icon">' + D.products[d.p].icon + '</div><div class="grow"><div class="ttl">' + d.q + "× " + D.products[d.p].name + " → " + d.cust + '</div><div class="sub">Pays ' + coinTxt(d.reward) + ' on arrival</div><div class="mini-bar"><i style="width:' + Math.round(d.t / d.dur * 100) + '%;background:#f97316"></i></div></div></div></div>';
-      }); else h += '<div class="empty">Vehicle parked at the dock. Ship orders from the Orders tab.</div>';
-      if (nv) h += '<div class="card"><div class="row"><div class="icon">⬆️</div><div class="grow"><div class="ttl">Upgrade to ' + nv.name + '</div><div class="sub">' + nv.time + "s trips · " + nv.trips + " at a time · +" + Math.round(nv.bonus * 100) + "% bonus</div></div>" + (nv.unlock > S.level ? locked(nv.unlock) : btn("vehicle", coinTxt(nv.cost), "acc", S.coins < nv.cost)) + "</div></div>";
+        h += '<div class="card"><div class="row"><div class="icon">' + (d.ex ? "🌐" : D.products[d.p].icon) + '</div><div class="grow"><div class="ttl">' + d.q + "× " + D.products[d.p].name + " → " + d.cust + '</div><div class="sub">Pays ' + coinTxt(d.reward) + ' on arrival</div><div class="mini-bar"><i style="width:' + Math.round(d.t / d.dur * 100) + "%;background:" + (d.ex ? "#0ea5e9" : "#f97316") + '"></i></div></div></div></div>';
+      }); else h += '<div class="empty">Vehicles parked at the dock. Ship orders from the Orders tab.</div>';
+      if (nv) h += card("⬆️", "Upgrade to " + nv.name, nv.time + "s trips · " + nv.trips + " at a time · +" + Math.round(nv.bonus * 100) + "% bonus", nv.unlock > S.level ? locked(nv.unlock) : btn("vehicle", coinTxt(nv.cost), "acc", S.coins < nv.cost));
+      if (nf) h += card(["", "🚆", "🚢", "✈️"][S.fleet + 1], (S.fleet ? "Upgrade to " : "Export fleet: ") + nf.name, "Ships export orders abroad · " + nf.trips + " at a time · export orders pay 2.2×", nf.unlock > S.level ? locked(nf.unlock) : btn("fleet", coinTxt(nf.cost), "acc", S.coins < nf.cost));
       return h;
     },
     upgrade: function () {
-      var h = '<div class="ph"><h3>Upgrades</h3><small>Grow your factory</small></div>', ns = D.spaces[S.space + 1], nv = D.vehicles[S.vehicle + 1];
-      h += '<div class="card"><div class="row"><div class="icon">🏗️</div><div class="grow"><div class="ttl">' + (ns ? "Expand to " + ns.name : space().name + " (max in prototype)") + '</div><div class="sub">' + (ns ? ns.slots + " machine slots · " + ns.workers + " workers · shelf " + ns.goods + " · raw store " + ns.raw : "All space for Levels 1–10 unlocked") + "</div></div>" + (ns ? (ns.unlock > S.level ? locked(ns.unlock) : btn("expand", coinTxt(ns.cost), "acc", S.coins < ns.cost)) : '<span class="chip ok">OWNED</span>') + "</div></div>";
-      h += '<div class="card"><div class="row"><div class="icon">➡️</div><div class="grow"><div class="ttl">Conveyor belts</div><div class="sub">Goods ride straight to the shelf; spare workers maintain machines</div></div>' + (S.conveyor ? '<span class="chip ok">OWNED</span>' : D.conveyor.unlock > S.level ? locked(D.conveyor.unlock) : btn("conveyor", coinTxt(D.conveyor.cost), "acc", S.coins < D.conveyor.cost)) + "</div></div>";
-      h += '<div class="card"><div class="row"><div class="icon">🚚</div><div class="grow"><div class="ttl">' + (nv ? nv.name : veh().name) + '</div><div class="sub">' + (nv ? "Faster deliveries and bonus coins" : "Best vehicle in the prototype") + "</div></div>" + (nv ? (nv.unlock > S.level ? locked(nv.unlock) : btn("vehicle", coinTxt(nv.cost), "acc", S.coins < nv.cost)) : '<span class="chip ok">OWNED</span>') + "</div></div>";
-      h += '<div class="card"><div class="ttl">Machine tiers</div><div class="chips">' + D.tiers.map(function (t) { return '<span class="chip ' + (t.unlock <= S.level ? "ok" : "warn") + '">' + t.short + " " + t.name + (t.unlock > S.level ? " · Lv " + t.unlock : "") + "</span>"; }).join("") + '</div><div class="sub" style="margin-top:5px">Upgrade each machine from the Machines tab.</div></div>';
+      var h = '<div class="ph"><h3>Upgrades</h3><small>' + space().name + "</small></div>", ns = D.spaces[S.space + 1];
+      h += card("🏗️", ns ? "Expand to " + ns.name : space().name, ns ? ns.slots + " machine slots · " + ns.workers + " workers · shelf " + ns.goods + " · raw store " + ns.raw : "Your biggest site. Grow with plants and hubs.",
+        ns ? (ns.unlock > S.level ? locked(ns.unlock) : btn("expand", coinTxt(ns.cost), "acc", S.coins < ns.cost)) : OWNED);
+      h += card("➡️", "Conveyor belts", "Goods ride straight to the shelf; spare workers maintain machines", S.conveyor ? OWNED : D.conveyor.unlock > S.level ? locked(D.conveyor.unlock) : btn("conveyor", coinTxt(D.conveyor.cost), "acc", S.coins < D.conveyor.cost));
+      Object.keys(D.facilities).forEach(function (k) {
+        var f = D.facilities[k]; if (f.unlock > S.level + 30 && !S.fac[k]) return;
+        h += card(FAC_ICON[k] || "🏗️", f.name, f.desc, S.fac[k] ? OWNED : f.unlock > S.level ? locked(f.unlock) : btn("facility", coinTxt(f.cost), "acc", S.coins < f.cost, k));
+      });
+      if (S.level + 30 >= D.plants.unlock) h += card("🏭", "Satellite factories · " + S.plants + "/" + D.plants.max, S.plants ? S.plants + " plant" + (S.plants > 1 ? "s" : "") + " ship a finished unit every " + (D.plants.every / S.plants).toFixed(1) + "s" : "Extra plants make goods for you and send them by shuttle truck",
+        S.plants >= D.plants.max ? OWNED : D.plants.unlock > S.level ? locked(D.plants.unlock) : btn("plant", coinTxt(D.plants.cost(S.plants)), "acc", S.coins < D.plants.cost(S.plants)));
+      if (S.level + 30 >= D.hubs.unlock) h += card("🌍", "Global trade hubs · " + S.hubs + "/" + D.hubs.max, (S.hubs ? D.hubs.names.slice(0, S.hubs).join(", ") + ". " : "") + "Each hub adds +10% to export rewards and earns passive coins",
+        S.hubs >= D.hubs.max ? OWNED : D.hubs.unlock > S.level ? locked(D.hubs.unlock) : btn("hub", coinTxt(D.hubs.cost(S.hubs)), "acc", S.coins < D.hubs.cost(S.hubs)));
+      h += '<div class="card"><div class="ttl">Machine tiers</div><div class="chips">' + D.tiers.map(function (t) { return '<span class="chip ' + (t.unlock <= S.level ? "ok" : "warn") + '">' + t.short + " " + t.name + (t.unlock > S.level ? " · Lv " + t.unlock : "") + "</span>"; }).join("") + '</div><div class="sub" style="margin-top:5px">Upgrade each machine from the Machines tab or by tapping it.</div></div>';
       return h + teaser();
     },
     inventory: function () {
-      var h = '<div class="ph"><h3>Inventory</h3><small>Raw ' + rawTotal() + "/" + space().raw + " · Shelf " + goodsTotal() + "/" + space().goods + "</small></div>";
+      var h = '<div class="ph"><h3>Inventory</h3><small>Raw ' + fmt(rawTotal()) + "/" + space().raw + " · Shelf " + fmt(goodsTotal()) + "/" + space().goods + "</small></div>";
       unlockedRaws().forEach(function (r) {
         var R = D.raws[r];
         h += '<div class="card"><div class="row"><div class="icon">' + R.icon + '</div><div class="grow"><div class="ttl">' + R.name + ": " + S.raw[r] + '</div><div class="sub">' + R.cost + " coins each · for " + Object.keys(D.products).filter(function (p) { return D.products[p].raw === r && D.products[p].unlock <= S.level; }).map(function (p) { return D.products[p].name + (D.products[p].rawQty > 1 ? " (×" + D.products[p].rawQty + ")" : ""); }).join(", ") + '</div></div></div><div class="btns">' +
           R.pack.map(function (n) { return btn("buyRaw", "+" + n + " · " + coinTxt(n * R.cost), "", S.coins < n * R.cost || rawTotal() + n > space().raw, r + ":" + n); }).join("") + "</div></div>";
       });
-      h += '<div class="card"><div class="ttl">Finished goods</div><div class="chips">' + unlockedProducts().map(function (p) { return '<span class="chip">' + D.products[p].icon + " " + D.products[p].name + ": " + S.goods[p] + " · sells ~" + D.products[p].value + "</span>"; }).join("") + "</div></div>";
+      var dm = D.demandAt(S.level);
+      h += '<div class="card"><div class="ttl">Finished goods</div><div class="sub">Customers now mostly order: ' + dm.map(function (p) { return D.products[p].icon; }).join(" ") + ". Sell surplus to a wholesaler at " + Math.round(D.sellRate * 100) + "% of value.</div>" +
+        unlockedProducts().filter(function (p) { return S.goods[p] > 0 || dm.indexOf(p) >= 0; }).map(function (p) {
+          var P = D.products[p];
+          return '<div class="row" style="margin-top:6px"><div class="grow"><b>' + P.icon + " " + P.name + "</b> · " + S.goods[p] + '<div class="sub">sells ~' + fmtShort(P.value * D.levelMult(S.level)) + " per unit in orders</div></div>" + btn("sell", "Sell all · " + coinTxt(S.goods[p] * P.value * D.sellRate), "ghost sm", !S.goods[p], p) + "</div>";
+        }).join("") + "</div>";
       var tot = S.stats.produced + S.stats.wasted;
-      h += '<div class="card"><div class="ttl">Factory report</div><div class="chips"><span class="chip ok">Produced ' + S.stats.produced + '</span><span class="chip bad">Scrap ' + S.stats.wasted + (tot ? " (" + Math.round(S.stats.wasted / tot * 100) + "%)" : "") + '</span><span class="chip warn">Breakdowns ' + S.stats.breakdowns + '</span><span class="chip">Earned ' + coinTxt(S.stats.earned) + "</span></div></div>";
+      h += '<div class="card"><div class="ttl">Factory report</div><div class="chips"><span class="chip ok">Produced ' + fmt(S.stats.produced) + '</span><span class="chip bad">Scrap ' + fmt(S.stats.wasted) + (tot ? " (" + Math.round(S.stats.wasted / tot * 100) + "%)" : "") + '</span><span class="chip warn">Breakdowns ' + S.stats.breakdowns + '</span><span class="chip">Earned ' + coinTxt(S.stats.earned) + "</span>" + (S.plants ? '<span class="chip">🏭 Plants ' + S.plants + "</span>" : "") + (S.hubs ? '<span class="chip">🌍 Hubs ' + S.hubs + "</span>" : "") + "</div></div>";
       return h;
     },
     orders: function () {
       var h = '<div class="ph"><h3>Customer orders</h3><small>' + (S.orders.length < L().maxOrders ? "Next order in " + Math.max(0, Math.ceil(S.nextOrder)) + "s" : "Order board full") + "</small></div>";
       if (!S.orders.length) h += '<div class="empty">No orders right now. New customers are on their way…</div>';
       S.orders.forEach(function (o) {
-        var P = D.products[o.p], have = S.goods[o.p], ok = have >= o.q, busy = S.deliveries.length >= veh().trips, f = o.dl / o.dl0;
-        h += '<div class="card"><div class="row"><div class="icon" style="background:' + AVATAR[o.av] + ';color:#fff;font-weight:800;font-size:15px">' + o.cust[0] + '</div><div class="grow"><div class="ttl">' + o.cust + '</div><div class="sub">' + P.icon + " " + o.q + "× " + P.name + " · have " + have + "/" + o.q + "</div></div>" +
-          btn("ship", ok ? (busy ? "Vehicle out" : "🚚 Ship") : "Need " + (o.q - have), ok && !busy ? "grn" : "", !ok || busy, o.id) + "</div>" +
-          '<div class="chips"><span class="chip">💰 ' + coinTxt(Math.round(o.reward * (1 + veh().bonus))) + '</span><span class="chip timer ' + (f < 0.25 ? "bad" : f < 0.5 ? "warn" : "") + '">⏰ ' + Math.ceil(o.dl) + "s left</span></div>" +
+        var P = D.products[o.p], have = S.goods[o.p], ok = have >= o.q, v = o.ex ? fleetV() : veh(), busy = S.deliveries.filter(function (d) { return d.ex === !!o.ex; }).length >= v.trips, f = o.dl / o.dl0;
+        h += '<div class="card' + (o.ex ? " export" : "") + '"><div class="row"><div class="icon" style="background:' + (o.ex ? "#0369a1" : AVATAR[o.av]) + ';color:#fff;font-weight:800;font-size:15px">' + (o.ex ? "🌐" : o.cust[0]) + '</div><div class="grow"><div class="ttl">' + o.cust + (o.ex ? ' <span class="chip">EXPORT</span>' : "") + '</div><div class="sub">' + P.icon + " " + o.q + "× " + P.name + " · have " + have + "/" + o.q + "</div></div>" +
+          btn("ship", ok ? (busy ? (o.ex ? "Fleet out" : "Vehicle out") : o.ex ? ["", "🚆", "🚢", "✈️"][S.fleet] + " Export" : "🚚 Ship") : "Need " + (o.q - have), ok && !busy ? "grn" : "", !ok || busy, o.id) + "</div>" +
+          '<div class="chips"><span class="chip">💰 ' + coinTxt(Math.round(o.reward * (1 + v.bonus) * (S.fac.printLine ? 1.15 : 1))) + '</span><span class="chip timer ' + (f < 0.25 ? "bad" : f < 0.5 ? "warn" : "") + '">⏰ ' + Math.ceil(o.dl) + "s left</span></div>" +
           '<div class="mini-bar"><i style="width:' + Math.round(f * 100) + "%;background:" + (f < 0.25 ? "#ef4444" : f < 0.5 ? "#f59e0b" : "#22c55e") + '"></i></div></div>';
       });
       return h;
     }
   };
-  function teaser() {
-    return '<div class="card teaser"><div class="row"><div class="icon" style="background:rgba(255,255,255,.15);border:0">🔒</div><div class="grow"><div class="ttl">Levels 11–50 · FREE</div><div class="sub">Bigger workshops, more product lines, multiple machines and your first full factory. Coming in a future update.</div></div></div></div>' +
-      '<div class="card prem"><div class="row"><div class="icon" style="background:rgba(255,255,255,.18);border:0">👑</div><div class="grow"><div class="ttl">Premium Levels 51–250</div><div class="sub">Printing &amp; packaging lines, export orders, robotics, smart factories and a global empire. Planned for GUNVORA Premium. Not available in this prototype, and there are no payments here.</div></div></div></div>';
+  var FAC_ICON = { printLine: "🖨️", autoDock: "🦾", agv: "🛻", smart: "📡", solarRoof: "🔆" };
+  var TAB_TITLE = { machines: "Machines", workers: "Workers", delivery: "Delivery", upgrade: "Upgrades", inventory: "Inventory", orders: "Orders" };
+  function prodSelect(m) {
+    return '<select class="sel" data-act="product" data-arg="' + m.id + '">' + unlockedProducts().map(function (p) { var P = D.products[p], na = P.needs && !has(P.needs); return '<option value="' + p + '"' + (p === m.product ? " selected" : "") + (na ? " disabled" : "") + ">" + P.icon + " " + P.name + (na ? " (needs line)" : "") + "</option>"; }).join("") + "</select>";
   }
+  function teaser() {
+    if (S.level > D.freeLevels || S.premium) return '<div class="card prem"><div class="row"><div class="icon" style="background:rgba(255,255,255,.18);border:0">👑</div><div class="grow"><div class="ttl">Premium levels unlocked' + (S.premium ? " (tester)" : "") + '</div><div class="sub">Era ' + D.eraOf(S.level).n + " of 6 · " + D.eraOf(S.level).name + ". " + (D.maxLevel - S.level) + " levels to the Industrial Emperor finale.</div></div></div></div>";
+    return '<div class="card prem"><div class="row"><div class="icon" style="background:rgba(255,255,255,.18);border:0">👑</div><div class="grow"><div class="ttl">Premium Levels 51–250</div><div class="sub">Printing &amp; packaging lines, export orders by train, ship and plane, robotics, smart factories and a global empire. Levels 1–50 are free. No payments in this preview: testers can unlock premium from the Menu.</div></div></div></div>';
+  }
+
+  /* ---------------- bottom sheet / side panel ---------------- */
+  var sheetOpen = false;
   function renderPanel(force) {
+    if (!sheetOpen && !force) return;
     if (pointerDown && !force) return;
     var ae = document.activeElement; if (!force && ae && ae.tagName === "SELECT" && $("panel").contains(ae)) return;
     var h = PANELS[tab]();
-    if (h !== lastPanel || force) { var sc = $("panel").scrollTop; $("panelBody").innerHTML = h; $("panel").scrollTop = sc; lastPanel = h; }
+    if (h !== lastPanel || force) { var pb = $("panelBody"), sc = pb.scrollTop; pb.innerHTML = h; pb.scrollTop = sc; lastPanel = h; }
   }
-  function setTab(t) {
+  function openSheet() { sheetOpen = true; $("panel").classList.add("open"); $("panel").setAttribute("aria-hidden", "false"); closePop(); }
+  function closeSheet() {
+    if (!sheetOpen) return; sheetOpen = false; $("panel").classList.remove("open"); $("panel").setAttribute("aria-hidden", "true");
+    document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.remove("on"); }); tutCheck();
+  }
+  function setTab(t, keep) {
+    if (sheetOpen && tab === t && !keep) { closeSheet(); sfx.tap(); return; }
     tab = t; document.querySelectorAll("#tabs button").forEach(function (b) { b.classList.toggle("on", b.dataset.tab === t); });
-    $("panel").scrollTop = 0; renderPanel(true); hud(); sfx.tap(); tutCheck();
+    $("sheetTitle").textContent = TAB_TITLE[t]; openSheet(); $("panelBody").scrollTop = 0; renderPanel(true); hud(); sfx.tap(); tutCheck();
   }
   document.querySelectorAll("#tabs button").forEach(function (b) { b.addEventListener("click", function () { setTab(b.dataset.tab); }); });
+  $("sheetClose").addEventListener("click", function () { closeSheet(); sfx.tap(); });
+  // swipe the sheet down (portrait) or right (landscape) to close it
+  (function () {
+    var g = $("sheetGrab"), p = $("panel"), sx = 0, sy = 0, on = false, land = false, d = 0;
+    g.addEventListener("pointerdown", function (e) { if (e.target.closest("button")) return; on = true; sx = e.clientX; sy = e.clientY; d = 0; land = matchMedia("(orientation:landscape) and (max-height:600px)").matches; p.classList.add("drag"); try { g.setPointerCapture(e.pointerId); } catch (x) {} });
+    g.addEventListener("pointermove", function (e) { if (!on) return; d = Math.max(0, land ? e.clientX - sx : e.clientY - sy); p.style.transform = land ? "translateX(" + d + "px)" : "translateY(" + d + "px)"; });
+    function end() { if (!on) return; on = false; p.classList.remove("drag"); p.style.transform = ""; if (d > 60) closeSheet(); }
+    g.addEventListener("pointerup", end); g.addEventListener("pointercancel", end);
+  })();
+  // tapping the factory while the sheet is open just closes it
+  $("scene-wrap").addEventListener("pointerdown", function (e) {
+    if (e.target.closest("#pop") || e.target.closest("#goalsBox") || e.target.closest("#btnCam")) return;
+    if (sheetOpen && !(S.tut >= 0 && S.tut < TUT.length && S.level === 1)) { closeSheet(); e.stopPropagation(); e.preventDefault(); }
+  }, true);
   $("panel").addEventListener("pointerdown", function () { pointerDown = true; });
   window.addEventListener("pointerup", function () { setTimeout(function () { pointerDown = false; }, 60); });
   window.addEventListener("pointercancel", function () { pointerDown = false; });
-  $("panelBody").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-act]"); if (!b || b.disabled) return;
-    var a = b.dataset.act, g = b.dataset.arg;
+  function doAct(a, g) {
     if (a === "buyRaw") { var p = g.split(":"); A.buyRaw(p[0], +p[1]); }
     else if (a === "toggle") A.toggle(+g);
     else if (a === "service") A.service(+g);
@@ -907,7 +1078,17 @@
     else if (a === "expand") A.expand();
     else if (a === "conveyor") A.conveyor();
     else if (a === "vehicle") A.vehicle();
+    else if (a === "fleet") A.fleet();
+    else if (a === "facility") A.facility(g);
+    else if (a === "plant") A.plant();
+    else if (a === "hub") A.hub();
+    else if (a === "sell") A.sell(g);
     else if (a === "ship") A.ship(+g);
+    else if (a === "boost") tapMachine(S.machines[+g], true);
+  }
+  $("panelBody").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-act]"); if (!b || b.disabled) return;
+    doAct(b.dataset.act, b.dataset.arg);
     pointerDown = false; renderPanel(true); hud(); tutCheck(); save();
   });
   $("panelBody").addEventListener("change", function (e) {
@@ -917,6 +1098,45 @@
     s.blur(); pointerDown = false; renderPanel(true); save();
   });
 
+  /* ---------------- machine popover (tap a machine) ---------------- */
+  var popId = -1, popHtml = "";
+  function openPop(id) { popId = id; popHtml = ""; renderPop(); placePop(); }
+  function closePop() { popId = -1; $("pop").classList.add("hidden"); }
+  function renderPop() {
+    if (popId < 0) return;
+    var m = S.machines[popId]; if (!m) return closePop();
+    var tr = tierOf(m), nt = D.tiers[m.tier + 1], st = blockReason(m), op = staffed(m);
+    var h = '<div class="ph2"><b>M' + (m.id + 1) + " · " + tr.name + '</b><span class="chip">' + tr.short + '</span><button class="x" data-pact="close" aria-label="Close">✕</button></div>' +
+      '<div class="st ' + (m.broken ? "bad" : m.cyc ? "ok" : "") + '">' + st + "</div>" +
+      '<div class="sub">' + (op ? "👷 " + op.name : "No operator") + " · ⏱ " + cycleTime(m).toFixed(1) + "s · 🔧 " + Math.round(m.cond) + "%</div>" +
+      '<div class="mini-bar"><i style="width:' + (m.cyc ? Math.round(m.prog * 100) : m.cond) + "%;background:" + (m.cyc ? "#22c55e" : m.cond > 60 ? "#38bdf8" : m.cond > 35 ? "#f59e0b" : "#ef4444") + '"></i></div>' +
+      prodSelect(m).replace('class="sel"', 'class="sel" data-pact="product"') + '<div class="pbtns">' +
+      (m.broken ? pb("repair", "🔧 Repair", m.repair > 0 ? Math.ceil(m.repair) + "s" : fmtShort(D.repairCost) + " 🪙", "red", m.repair > 0) :
+        (m.cyc ? pb("boost", "⚡ Boost", "+12%", "grn", false) : pb("toggle", m.on ? "⏸ Stop" : "▶ Start", m.on ? "running" : "off", m.on ? "ghost" : "grn", false))) +
+      pb("service", "🛠 Service", fmtShort(D.serviceCost) + " 🪙", "ghost", m.broken || m.cond >= 99) +
+      (nt ? (nt.unlock > S.level ? pb("", "⬆ " + nt.short, "Lv " + nt.unlock, "", true) : pb("upMachine", "⬆ " + nt.short, fmtShort(nt.upCost) + " 🪙", "acc", S.coins < nt.upCost)) : pb("", "MAX", "tier", "", true)) + "</div>";
+    if (h !== popHtml) { var ae = document.activeElement; if (ae && ae.tagName === "SELECT" && $("pop").contains(ae)) return; $("pop").innerHTML = h; popHtml = h; }
+    $("pop").classList.remove("hidden");
+  }
+  function pb(act, label, small, cls, dis) { return '<button class="btn ' + cls + '" data-pact="' + act + '"' + (dis ? " disabled" : "") + ">" + label + "<small>" + small + "</small></button>"; }
+  function placePop() {
+    if (popId < 0 || !S.machines[popId]) return;
+    var s = SLOTS[popId], a = $("scene-wrap").getBoundingClientRect(), ap = $("app").getBoundingClientRect(), p = R3 ? R3.toApp(s.x, s.y - 10, 2.2) : sceneToApp(s.x, s.y - 50);
+    var x = p.x - (a.left - ap.left), y = p.y - (a.top - ap.top), el = $("pop"), ph = el.offsetHeight || 150;
+    var below = y - ph - 10 < 4; if (below) y = (R3 ? R3.toApp(s.x, s.y + 20, 0).y - (a.top - ap.top) : y + 60) + 10;
+    x = Math.max(110, Math.min(a.width - 110, x)); y = Math.max(4, Math.min(a.height - (below ? ph + 4 : 4), y));
+    el.classList.toggle("below", below); el.style.left = x + "px"; el.style.top = (below ? y : y - 6) + "px";
+  }
+  $("pop").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-pact]"); if (!b || b.disabled || b.tagName === "SELECT") return;
+    var a = b.dataset.pact;
+    if (a === "close") { closePop(); sfx.tap(); return; }
+    if (a) doAct(a, popId);
+    popHtml = ""; renderPop(); hud(); tutCheck(); save();
+  });
+  $("pop").addEventListener("change", function (e) { var s = e.target; if (s.dataset.pact === "product") { A.setProduct(popId, s.value); s.blur(); popHtml = ""; renderPop(); save(); } });
+  ["pointerdown", "touchstart", "wheel"].forEach(function (ev) { $("pop").addEventListener(ev, function (e) { e.stopPropagation(); }, { passive: true }); });
+
   /* ---------------- modals ---------------- */
   function modal(html) { $("modal").innerHTML = '<div class="mbox">' + html + "</div>"; $("modal").classList.remove("hidden"); modalOpen = true; }
   function closeModal() { $("modal").classList.add("hidden"); modalOpen = false; }
@@ -924,38 +1144,57 @@
     var b = e.target.closest("[data-m]"); if (!b) { if (e.target.id === "modal" && !S.pendingLevelUp) closeModal(); return; }
     var a = b.dataset.m; sfx.tap();
     if (a === "close") closeModal();
-    if (a === "next") { closeModal(); advanceLevel(); }
+    if (a === "next") { closeModal(); advanceLevel(); if (S.gate) premiumGate(); else { goalsAuto = T + 5; fire("levelStart", { n: S.level }); } }
     if (a === "map") levelMap();
     if (a === "sound") { S.sound = !S.sound; save(); menu(); }
     if (a === "gfx" && R3) { var qs = ["high", "medium", "low"], qi = qs.indexOf(R3.quality()); R3.setQuality(qs[(qi + 1) % 3]); menu(); }
+    if (a === "prem") { A.premium(!S.premium); if (b.dataset.from === "gate") { closeModal(); goalsAuto = T + 5; } else menu(); }
     if (a === "tut") { closeModal(); S.tut = 0; if (S.level !== 1) toast("The tutorial runs on Level 1. Tips are in each tab."); tutShow(); }
-    if (a === "reset") { if (confirm("Erase all Factory Kingdom progress on this device?")) { localStorage.removeItem(D.saveKey); if (D.oldSaveKey) localStorage.removeItem(D.oldSaveKey); S = fresh(); belt = []; closeModal(); setTab("machines"); tutShow(); } }
+    if (a === "reset") { if (confirm("Erase all Factory Kingdom progress on this device?")) { localStorage.removeItem(D.saveKey); if (D.oldSaveKey) localStorage.removeItem(D.oldSaveKey); S = fresh(); belt = []; closeModal(); closeSheet(); closePop(); tutShow(); } }
+    if (a === "era") { var el = document.getElementById("era" + b.dataset.e); if (el) el.scrollIntoView({ block: "start" }); }
   });
   function showLevelUp() {
-    var l = L(), nl = D.levels[l.n];
-    sfx.level(); confetti(150); coinFly(200, 200, 12);
-    if (l.n < 10) {
-      modal('<div class="big">🏆</div><h2>Level ' + l.n + ' complete!</h2><p><b>' + l.title + '</b> done. Your factory is growing!</p>' +
-        '<div class="rewards"><div>💰 Reward: +' + fmt(l.reward) + " coins</div>" + (nl.unlocks || []).map(function (u) { return "<div>🔓 " + u + "</div>"; }).join("") + "</div>" +
-        '<p class="sub">Next up: <b>Level ' + nl.n + " · " + nl.title + "</b></p>" + '<button class="btn acc" data-m="next">Continue ▶</button>');
-    } else {
-      modal('<div class="big">👑</div><h2>Small Factory built!</h2><p>You turned a rented shed into a working factory and finished all 10 prototype levels.</p>' +
-        '<div class="rewards"><div>💰 Milestone reward: +' + fmt(l.reward) + " coins</div><div>🏅 Badge: Factory Founder</div></div>" + teaser() +
-        '<button class="btn acc" data-m="next">Keep building ▶</button>');
+    var l = L(), nl = D.levels[l.n], era = D.eraOf(l.n), nera = nl && D.eraOf(nl.n);
+    sfx.level(); confetti(l.mile ? 220 : 120); coinFly(200, 200, 12);
+    if (l.n >= D.maxLevel) {
+      modal('<div class="big">👑</div><h2>Industrial Emperor!</h2><p>From one wooden press in a rented shed to a global industrial empire. You finished all <b>250 levels</b> of Factory Kingdom.</p>' +
+        '<div class="rewards"><div>💰 Finale reward: +' + fmt(l.reward) + " coins</div><div>🏭 Produced " + fmt(S.stats.produced) + " units · " + fmt(S.stats.orders) + " orders · " + fmt(S.stats.exports || 0) + " exports</div><div>🌍 " + S.hubs + " global hubs · " + S.plants + " satellite plants</div><div>🏅 Badge: " + l.badge + "</div></div>" +
+        '<button class="btn acc" data-m="next">Keep running the empire ▶</button>');
+      return;
     }
+    var newEra = nera && nera.n !== era.n;
+    modal('<div class="big">' + (newEra ? "🌟" : l.mile ? "🏅" : "🏆") + "</div><h2>Level " + l.n + " complete!</h2><p><b>" + l.title + "</b> done." + (l.mile ? " Milestone reached!" : "") + "</p>" +
+      '<div class="rewards"><div>💰 Reward: +' + fmt(l.reward) + " coins</div>" + (l.badge ? "<div>🏅 Badge: " + l.badge + "</div>" : "") + (l.unlocks || []).map(function (u) { return "<div>🔓 " + u + "</div>"; }).join("") + "</div>" +
+      (newEra ? '<div class="card teaser"><div class="ttl">New era: ' + nera.name + '</div><div class="sub">Levels ' + nera.from + "–" + nera.to + " · " + nera.desc + "</div></div>" : "") +
+      (l.n === D.freeLevels && !S.premium ? teaser() : "") +
+      '<p class="sub">Next up: <b>Level ' + nl.n + " · " + nl.title + "</b>" + (nl.n > D.freeLevels ? " 👑" : "") + "</p>" + '<button class="btn acc" data-m="next">Continue ▶</button>');
+  }
+  function premiumGate() {
+    modal('<div class="big">👑</div><h2>Free levels complete!</h2><p>You built a <b>' + space().name + "</b> and finished levels 1–50.</p>" + teaser() +
+      '<p class="sub">This is a preview build. There are no payments here.</p><button class="btn acc" data-m="prem" data-from="gate">🧪 Tester: unlock premium</button><button class="btn ghost" data-m="close">Keep playing level 50</button>');
   }
   function levelMap() {
-    var h = '<h2>Level map</h2><p class="sub">Factory Kingdom 250 · prototype levels 1–10</p><div class="lvlist">', i;
-    for (i = 1; i <= 10; i++) { var dn = i < S.level || S.allDone; h += '<div class="lv ' + (dn ? "done" : i === S.level ? "cur" : "") + '">' + (dn ? "✓" : i) + "</div>"; }
-    for (i = 11; i <= 15; i++) h += '<div class="lv lk" title="Level ' + i + '">🔒</div>';
-    h += "</div>" + D.levels.map(function (l) { return '<div class="sub" style="text-align:left;padding:2px 0">' + (l.n < S.level || S.allDone ? "✅" : l.n === S.level ? "▶️" : "⬜") + " <b>" + l.n + ".</b> " + l.title + "</div>"; }).join("");
-    h += '<div style="margin-top:10px">' + teaser() + '</div><div class="card"><div class="ttl">Full game roadmap</div>' + D.roadmap.map(function (r) { return '<div class="sub">Levels <b>' + r[0] + "</b> · " + r[1] + "</div>"; }).join("") + "</div>";
+    var h = '<h2>Level map</h2><p class="sub">Factory Kingdom 250 · Level ' + S.level + " · " + (S.premium ? "Premium unlocked (tester)" : "Levels 1–50 free") + '</p><div class="eratabs">' +
+      D.eras.map(function (e) { return '<button class="chip' + (D.eraOf(S.level).n === e.n ? " ok" : "") + '" data-m="era" data-e="' + e.n + '">' + e.from + "–" + e.to + "</button>"; }).join("") + "</div>";
+    D.eras.forEach(function (e) {
+      h += '<div class="erahd" id="era' + e.n + '"><b>Era ' + e.n + " · " + e.name + "</b><small>" + e.desc + (e.from > D.freeLevels ? " · 👑 Premium" : " · Free") + "</small></div><div class=\"lvlist\">";
+      for (var i = e.from; i <= e.to; i++) {
+        var dn = i < S.level || S.allDone, l = D.levels[i - 1], lk = i > D.freeLevels && !S.premium;
+        h += '<div class="lv ' + (dn ? "done" : i === S.level ? "cur" : lk ? "lk" : "") + (l.mile ? " mile" : "") + '" title="' + i + ". " + l.title + '">' + (dn ? "✓" : lk && i !== S.level ? "🔒" : i) + "</div>";
+      }
+      h += "</div>";
+    });
+    var cl = L();
+    h += '<div class="card"><div class="ttl">Now: ' + cl.n + ". " + cl.title + '</div><div class="sub">' + cl.goals.map(goalLabel).join(" · ") + "</div></div>";
     modal(h + '<button class="btn" data-m="close">Back to factory</button>');
+    setTimeout(function () { var el = document.querySelector("#modal .lv.cur"); if (el) el.scrollIntoView({ block: "center" }); }, 30);
   }
   function menu() {
-    modal('<h2>Menu</h2><p class="sub">Factory Kingdom 250 · GUNVORA GAMES<br>Prototype build · Levels 1–10 free</p>' +
+    modal('<h2>Menu</h2><p class="sub">Factory Kingdom 250 · GUNVORA GAMES<br>Preview build · Levels 1–50 free · 51–250 premium</p>' +
       '<button class="btn" data-m="map">🗺️ Level map</button><button class="btn ghost" data-m="sound">' + (S.sound ? "🔊 Sound: on" : "🔈 Sound: off") + '</button>' +
       (R3 ? '<button class="btn ghost" data-m="gfx">Graphics: ' + R3.qualities[R3.quality()].label + '</button>' : "") +
+      '<button class="btn ghost tester" data-m="prem">🧪 Tester: unlock premium · ' + (S.premium ? "ON" : "OFF") + '</button>' +
+      '<p class="sub" style="font-size:11px">Testing only. No real payments exist in this build.</p>' +
       '<button class="btn ghost" data-m="tut">🎓 Replay tutorial</button><button class="btn ghost" data-m="reset">🗑 Reset progress</button><button class="btn acc" data-m="close">Resume</button>' +
       '<p class="sub" style="margin-top:10px">Progress saves automatically on this device.</p>');
   }
@@ -966,34 +1205,36 @@
   var TUT = [
     { txt: "<b>Welcome to Factory Kingdom!</b> You rent a small shed with <b>1 Basic Press</b> and <b>2 workers</b>. Let's make toy cars and build an empire.", target: "scene", next: "Let's go" },
     { txt: "<b>Tap the machine</b> to switch it on. Ravi will run it and turn wood into toy cars.", target: "m0", wait: function () { return S.machines[0].on; } },
-    { txt: "Great! Priya <b>carries finished toys</b> to the shelf. Tip: <b>tap a running machine</b> to speed it up ⚡", target: "shelf", next: "Next" },
-    { txt: "Customers send orders with a <b>deadline</b>. Open the <b>Orders</b> tab.", target: "tab:orders", wait: function () { return tab === "orders"; } },
-    { txt: "When you have enough toys, tap <b>🚚 Ship</b>. You get paid when the cart arrives. Buy more wood in <b>Inventory</b> when you run low.", target: "panel", next: "Got it" },
-    { txt: "Finish the <b>goals</b> at the top to complete Level 1. Good luck, boss!", target: "goals", next: "Start building" }
+    { txt: "Great! Priya <b>carries finished toys</b> to the shelf. Tap a machine any time for quick actions, or tap a running one to speed it up ⚡", target: "shelf", next: "Next" },
+    { txt: "Customers send orders with a <b>deadline</b>. Open the <b>Orders</b> tab below.", target: "tab:orders", wait: function () { return sheetOpen && tab === "orders"; } },
+    { txt: "When you have enough toys, tap <b>🚚 Ship</b>. Swipe the panel down or tap the factory to close it. Buy wood in <b>Inventory</b>.", target: "panel", next: "Got it" },
+    { txt: "Finish the <b>goals</b> (top left) to complete Level 1. Good luck, boss!", target: "goalsBox", next: "Start building" }
   ];
   function tutRect(t) {
     var a = $("app").getBoundingClientRect(), r, p, q;
     if (R3 && (t === "m0" || t === "shelf")) { var rr3 = R3.rect(t); if (rr3) return rr3; }
-    if (R3 && t === "scene") { r = $("scene-wrap").getBoundingClientRect(); return { x: r.left - a.left, y: r.top - a.top, w: r.width, h: r.height }; }
     if (t === "m0") { p = sceneToApp(SLOTS[0].x - 40, SLOTS[0].y - 72); q = sceneToApp(SLOTS[0].x + 44, SLOTS[0].y + 36); return { x: p.x, y: p.y, w: q.x - p.x, h: q.y - p.y }; }
     if (t === "shelf") { p = sceneToApp(SHELF_X - 8, 86); q = sceneToApp(SHELF_X + 58, bottomY()); return { x: p.x, y: p.y, w: q.x - p.x, h: q.y - p.y }; }
-    if (t === "scene") r = cv.getBoundingClientRect();
+    if (t === "scene") r = $("scene-wrap").getBoundingClientRect();
     else if (t.indexOf("tab:") === 0) r = document.querySelector('#tabs [data-tab="' + t.slice(4) + '"]').getBoundingClientRect();
     else r = $(t).getBoundingClientRect();
     return { x: r.left - a.left, y: r.top - a.top, w: r.width, h: r.height };
   }
   function tutShow() {
     if (S.tut < 0 || S.tut >= TUT.length || S.level !== 1) { $("tut").classList.add("hidden"); if (S.tut >= TUT.length) S.tut = -1; return; }
-    var st = TUT[S.tut], r = tutRect(st.target), ring = $("tutRing"), box = $("tutBox"), a = $("app").getBoundingClientRect();
+    var st = TUT[S.tut], r = tutRect(st.target), ring = $("tutRing"), box = $("tutBox"), a = $("app").getBoundingClientRect(), sw = $("scene-wrap").getBoundingClientRect();
     $("tut").classList.remove("hidden");
+    if (st.target === "scene") ring.style.display = "none"; else ring.style.display = "";
     ring.style.left = r.x - 4 + "px"; ring.style.top = r.y - 4 + "px"; ring.style.width = r.w + 8 + "px"; ring.style.height = r.h + 8 + "px";
     var html = st.txt + '<div class="tn"><small>' + (S.tut + 1) + " / " + TUT.length + ' · <a href="#" data-skip style="color:inherit">skip</a></small>' + (st.next ? '<button class="btn acc sm" data-tnext>' + st.next + "</button>" : "<small>👆 " + (st.target === "m0" ? "Tap the machine" : "Tap the highlight") + "</small>") + "</div>";
     if (box.innerHTML !== html) box.innerHTML = html;
-    var bh = box.offsetHeight || 110, y;
-    if (st.target === "scene") y = r.y + r.h - bh - 10;
-    else if (st.target === "panel") y = r.y + 10;
-    else y = (r.y + r.h / 2 < a.height / 2) ? r.y + r.h + 14 : r.y - bh - 14;
-    box.style.top = Math.max(8, Math.min(a.height - bh - 8, y)) + "px";
+    // keep the bubble in a free strip of the scene: never on top of the highlighted thing
+    var bh = box.offsetHeight || 90, top = sw.top - a.top, bot = sw.bottom - a.top, y;
+    if (st.target === "panel") { var pr = $("panel").getBoundingClientRect(); y = pr.top - a.top - bh - 10; }
+    else if (st.target === "scene" || st.target.indexOf("tab:") === 0) y = bot - bh - 10;
+    else if (st.target === "goalsBox") y = r.y + r.h + 12;
+    else y = (r.y + r.h / 2 < (top + bot) / 2) ? r.y + r.h + 12 : r.y - bh - 12;
+    box.style.top = Math.max(top + 4, Math.min(bot - bh - 4, y)) + "px";
   }
   function tutCheck() {
     if (S.tut < 0) return; var st = TUT[S.tut];
@@ -1012,7 +1253,7 @@
     var simDt = (S.pendingLevelUp || window.FK_3D_PENDING) ? 0 : dt * SPEED, n = Math.ceil(simDt / 0.05);
     for (var i = 0; i < n; i++) step(simDt / n);
     if (S.pendingLevelUp) { floats.forEach(function (f) { f.life -= dt; }); }
-    render();
+    render(); if (popId >= 0) placePop();
     uiT += dt; if (uiT > 0.25 || uiDirty) { uiT = 0; uiDirty = false; hud(); renderPanel(); if (S.tut >= 0) tutCheck(); }
     saveT += dt; if (saveT > 3) { saveT = 0; save(); }
     requestAnimationFrame(frame);
@@ -1023,7 +1264,7 @@
   document.addEventListener("visibilitychange", function () { if (document.hidden) save(); });
   window.addEventListener("pagehide", save);
   resize(); hud(); renderPanel(true);
-  if (S.pendingLevelUp) setTimeout(showLevelUp, 300);
+  if (S.pendingLevelUp) setTimeout(showLevelUp, 300); else if (S.gate) setTimeout(premiumGate, 300); else goalsAuto = 5;
   setTimeout(tutShow, 80);
   requestAnimationFrame(frame);
 
@@ -1045,6 +1286,7 @@
     state: function () { return S; }, actions: A, data: D, belt: function () { return belt; },
     sim: function (sec) { var n = Math.ceil(sec / 0.05); for (var i = 0; i < n; i++) { if (S.pendingLevelUp) return true; step(0.05); } return S.pendingLevelUp; },
     levelPct: levelPct, advance: function () { closeModal(); advanceLevel(); }, setTab: setTab, tapMachine: function (i) { tapMachine(S.machines[i]); },
-    setSpeed: function (s) { SPEED = s; }, save: save, headless: false
+    setSpeed: function (s) { SPEED = s; }, save: save, headless: false,
+    openPop: openPop, closePop: closePop, closeSheet: closeSheet, isSheetOpen: function () { return sheetOpen; }, menu: menu, levelMap: levelMap, premiumGate: premiumGate, showLevelUp: showLevelUp
   };
 })();

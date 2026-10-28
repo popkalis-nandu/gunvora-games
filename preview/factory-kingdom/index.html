@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <meta name="robots" content="noindex">
+<meta name="fk-build" content="phase3-250-levels">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="description" content="Factory Kingdom 250 by GUNVORA GAMES. From one machine to a worldwide manufacturing empire. Prototype: levels 1-10.">
+<meta name="description" content="Factory Kingdom 250 by GUNVORA GAMES. From one machine to a worldwide manufacturing empire. 250 levels across six eras.">
 <title>Factory Kingdom 250 · GUNVORA GAMES</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='2' y='2' width='60' height='60' rx='16' fill='%234338ca'/%3E%3Cpath d='M12 50V30l12 8V30l12 8V18h8v32z' fill='%23fff'/%3E%3Ccircle cx='48' cy='14' r='5' fill='%23f97316'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
@@ -26,39 +27,25 @@
 <body>
 <div id="app">
   <header id="hud">
-    <div class="hud-top">
-      <div class="brand">
-        <svg class="mark" viewBox="0 0 64 64" width="34" height="34" aria-hidden="true"><defs><linearGradient id="bm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset=".55" stop-color="#4338ca"/><stop offset="1" stop-color="#6d28d9"/></linearGradient></defs><rect x="2" y="2" width="60" height="60" rx="16" fill="url(#bm)"/><path d="M12 50V30l12 8V30l12 8V18h8v32z" fill="#fff"/><circle cx="48" cy="13" r="5" fill="#f97316" stroke="#fff" stroke-width="2"/></svg>
-        <div class="bt"><small>GUNVORA GAMES</small><b>FACTORY KINGDOM <i>250</i></b></div>
-      </div>
-      <div class="hud-right">
-        <span class="free">FREE</span>
-        <button id="btnMenu" class="icon-btn" aria-label="Menu"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      </div>
-    </div>
-    <button id="lvlTitle" class="lvl-title" aria-label="Level map">Level 1 · Rented Shed <span>▾</span></button>
-    <div class="stats">
-      <div class="stat"><small>Coins</small><b id="sCoins"><i class="coin"></i>0</b></div>
-      <div class="stat"><small>Workers</small><b id="sWorkers">2 / 3</b></div>
-      <div class="stat"><small>Orders</small><b id="sOrders">0 / 2</b></div>
-    </div>
-    <div class="prog"><div class="prog-lbl"><span>Level progress</span><span id="sPct">0%</span></div><div class="bar"><i id="sBar"></i></div></div>
-    <div id="goals" class="goals"></div>
+    <button id="lvlTitle" class="lvl-pill" aria-label="Level map"><b id="lvlNum">1</b><span id="lvlName">Rented Shed</span><i>▾</i></button>
+    <div class="hstat coins" title="Coins"><i class="coin"></i><b id="sCoins">0</b></div>
+    <div class="hstat" title="Workers"><svg viewBox="0 0 24 24"><path d="M5 11a7 7 0 0 1 14 0M4 11h16M8 11a4 4 0 0 0 8 0M5 21a7 7 0 0 1 14 0"/></svg><b id="sWorkers">2/3</b></div>
+    <div class="hstat" title="Orders"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 8h6M9 12h6M9 16h4"/></svg><b id="sOrders">0/2</b></div>
+    <button id="btnMenu" class="icon-btn" aria-label="Menu"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="hbar"><i id="sBar"></i></div>
   </header>
   <section id="scene-wrap"><canvas id="scene"></canvas><div id="toasts"></div>
-    <button id="btnCam" class="cam-btn" aria-label="Recenter camera" title="Recenter camera"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
-    <div id="hint">Drag to pan · pinch or scroll to zoom · tap machines</div>
+    <div id="goalsBox" class="goals-box"><button id="goalsTgl" class="goals-tgl"><span id="sPct">0%</span><span id="goalsSum">Goals</span><i>▾</i></button><div id="goals" class="goals"></div></div>
+    <button id="btnCam" class="cam-btn" aria-label="Recenter camera" title="Recenter camera"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+    <div id="hint">Drag to pan · pinch to zoom · tap a machine</div>
+    <div id="pop" class="pop hidden"></div>
     <div id="loader"><div class="ld-mark">GUNVORA GAMES</div><div class="ld-t">FACTORY KINGDOM 250</div><div class="ld-bar"><i id="ldBar"></i></div><div class="ld-s">Loading 3D factory… <span id="ldPct">0%</span></div></div>
   </section>
-  <section id="panel"><div id="panelBody"></div></section>
-  <nav id="tabs">
-    <button data-tab="machines" class="on"><span><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/><path d="M19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-1.7 1l-.3 2h-4l-.3-2a7 7 0 0 1-1.7-1l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2L3 10.3l2-3.4 1.9.7a7 7 0 0 1 1.7-1l.3-2h4l.3 2a7 7 0 0 1 1.7 1l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2z"/></svg></span>Machines</button>
-    <button data-tab="workers"><span><svg viewBox="0 0 24 24"><path d="M5 11a7 7 0 0 1 14 0"/><path d="M4 11h16"/><path d="M8 11a4 4 0 0 0 8 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg></span>Workers</button>
-    <button data-tab="delivery"><span><svg viewBox="0 0 24 24"><path d="M2 6h12v10H2z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span>Delivery</button>
-    <button data-tab="upgrade"><span><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4V10l6 4V5h4v16z"/></svg></span>Upgrade</button>
-    <button data-tab="inventory"><span><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></span>Inventory</button>
-    <button data-tab="orders"><span><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span>Orders<em id="ordBadge"></em></button>
-  </nav>
+  <section id="panel" class="sheet" aria-hidden="true"><div class="grab" id="sheetGrab"><i></i><b id="sheetTitle">Machines</b><button id="sheetClose" aria-label="Close">✕</button></div><div id="panelBody"></div></section>
+  <footer id="bar">
+    <button id="status" class="status"><i id="statusDot"></i><span id="statusTxt">Ready</span></button>
+    <nav id="tabs"><button data-tab="machines"><span><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"/><path d="M19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-1.7 1l-.3 2h-4l-.3-2a7 7 0 0 1-1.7-1l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2L3 10.3l2-3.4 1.9.7a7 7 0 0 1 1.7-1l.3-2h4l.3 2a7 7 0 0 1 1.7 1l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2z"/></svg></span><small>Machines</small></button><button data-tab="workers"><span><svg viewBox="0 0 24 24"><path d="M5 11a7 7 0 0 1 14 0"/><path d="M4 11h16"/><path d="M8 11a4 4 0 0 0 8 0"/><path d="M5 21a7 7 0 0 1 14 0"/></svg></span><small>Workers</small></button><button data-tab="delivery"><span><svg viewBox="0 0 24 24"><path d="M2 6h12v10H2z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="6" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span><small>Delivery</small></button><button data-tab="upgrade"><span><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4V10l6 4V5h4v16z"/></svg></span><small>Upgrade</small></button><button data-tab="inventory"><span><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></span><small>Inventory</small></button><button data-tab="orders"><span><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></span><small>Orders</small><em id="ordBadge"></em></button></nav>
+  </footer>
   <div id="modal" class="hidden"></div>
   <div id="tut" class="hidden"><div id="tutRing"></div><div id="tutBox"></div></div>
   <canvas id="fx"></canvas>
