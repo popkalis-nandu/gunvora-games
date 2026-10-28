@@ -15,26 +15,28 @@ window.GV_CONFIG = {
   siteUrl: "https://popkalis-nandu.github.io/gunvora-games",              // >>> REPLACE <<< your live domain, no trailing slash
 
   /* ---------- Business / legal identity (shown on legal pages) ---------- */
-  businessName: "[Your Business Name]",            // >>> REPLACE <<< e.g. "Gaming World of Jarvis" or your registered firm name
-  legalEntity: "[Sole Proprietorship / LLP / Pvt Ltd]", // >>> REPLACE <<<
-  ownerName: "[Owner / Proprietor Name]",          // >>> REPLACE <<<
-  address: "[Street Address], [City], [State] – [PIN], India", // >>> REPLACE <<<
-  jurisdictionCity: "[Your City]",                 // >>> REPLACE <<< courts of this city have jurisdiction
-  gstin: "",                                       // optional — leave "" if not GST-registered
-  contactEmail: "support@example.com",             // >>> REPLACE <<<
-  contactPhone: "+91-00000-00000",                 // >>> REPLACE <<<
-  supportHours: "Mon–Sat, 10:00–18:00 IST",
+  businessName: "Novature HRMS",                   // from novature.in (footer: "© 2026 Novature HRMS")
+  legalEntity: "[Sole Proprietorship / LLP / Pvt Ltd]", // >>> REPLACE <<< not shown on novature.in
+  ownerName: "Balachandar A., Managing Director",  // from novature.in/about.html & contact.html
+  address: "[Street Address], [City], [State] – [PIN], India", // >>> REPLACE <<< not shown on novature.in
+  jurisdictionCity: "[Your City]",                 // >>> REPLACE <<< courts of this city have jurisdiction (not on novature.in)
+  gstin: "",                                       // optional — leave "" if not GST-registered (none shown on novature.in)
+  contactEmail: "info@novature.in",                // from novature.in (contact, support, footer)
+  contactPhone: "+91 98436 86898",                 // from novature.in (phone & WhatsApp)
+  whatsapp: "https://wa.me/919843686898",          // from novature.in/contact.html
+  parentSite: "https://novature.in/",              // "A Novature product" link
+  supportHours: "Mon–Sat, 10:00–18:00 IST",       // >>> CONFIRM <<< novature.in does not list support hours
 
   /* ---------- Grievance Officer (IT Rules 2021 / DPDP Act 2023 / E-Commerce Rules 2020) ---------- */
   grievanceOfficer: {
-    name: "[Grievance Officer Name]",              // >>> REPLACE <<<
+    name: "Balachandar A.",                         // named contact on novature.in — >>> CONFIRM <<< he is the designated Grievance Officer
     designation: "Grievance Officer",
-    email: "grievance@example.com",                // >>> REPLACE <<<
-    phone: "+91-00000-00000",                      // >>> REPLACE <<<
+    email: "info@novature.in",
+    phone: "+91 98436 86898",
     address: "[Same as business address or other]" // >>> REPLACE <<<
   },
 
-  legalLastUpdated: "26 October 2026",
+  legalLastUpdated: "28 October 2026",
   minimumAge: 18,      // age below which parental consent is required (DPDP Act 2023 defines a child as < 18)
 
   /* ---------- Prices (display only — the real amount is set inside your payment link) ---------- */
