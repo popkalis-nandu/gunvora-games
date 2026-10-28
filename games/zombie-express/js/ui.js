@@ -57,7 +57,7 @@ export class UI {
     this.show('title');
   }
   show(id) { this.root.querySelectorAll('.screen').forEach(s => s.classList.toggle('hidden', s.id !== 's-' + id)); this.cur = id;
-    if (id === 'title') this._title(); if (id === 'levels') this._levels(); if (id === 'shop') this._shop(); }
+    if (id === 'title') this._title(); if (id === 'levels') { this.page = null; this._levels(); } if (id === 'shop') this._shop(); }
   go(a) {
     const c = this.cfg;
     if (a === 'play') return c.onStart(Math.min(this.save.d.unlocked, c.levels));

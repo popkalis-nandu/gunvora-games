@@ -39,11 +39,12 @@ export class Input {
     jz.addEventListener('pointerdown', e => { e.preventDefault(); jid = e.pointerId; jz.setPointerCapture(jid); jx = e.clientX; jy = e.clientY; joy.style.left = (jx - 65) + 'px'; joy.style.top = (jy - 65) + 'px'; joy.classList.add('on'); });
     jz.addEventListener('pointermove', e => { if (e.pointerId !== jid) return; let dx = e.clientX - jx, dy = e.clientY - jy; const l = Math.hypot(dx, dy); if (l > R) { dx *= R / l; dy *= R / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; this.joy.x = dx / R; this.joy.y = dy / R; });
     const jend = e => { if (e.pointerId !== jid) return; jid = null; this.joy.x = this.joy.y = 0; knob.style.transform = ''; joy.classList.remove('on'); };
-    jz.addEventListener('pointerup', jend); jz.addEventListener('pointercancel', jend);
+    jz.addEventListener('pointerup', jend); jz.addEventListener('pointercancel', jend); jz.addEventListener('lostpointercapture', jend);
+    this._resetJoy = () => { jid = null; this.joy.x = this.joy.y = 0; knob.style.transform = ''; joy.classList.remove('on'); looks.clear(); root.querySelectorAll('.t-btn').forEach(b => { if (b.dataset.a !== 'sprint') b.classList.remove('on'); }); };
     const looks = new Map();
     lz.addEventListener('pointerdown', e => { e.preventDefault(); lz.setPointerCapture(e.pointerId); looks.set(e.pointerId, [e.clientX, e.clientY]); });
     lz.addEventListener('pointermove', e => { const p = looks.get(e.pointerId); if (!p) return; this.lookX += (e.clientX - p[0]) * 0.006 * this.sens; this.lookY += (e.clientY - p[1]) * 0.006 * this.sens; p[0] = e.clientX; p[1] = e.clientY; });
-    const lend = e => looks.delete(e.pointerId); lz.addEventListener('pointerup', lend); lz.addEventListener('pointercancel', lend);
+    const lend = e => looks.delete(e.pointerId); lz.addEventListener('pointerup', lend); lz.addEventListener('pointercancel', lend); lz.addEventListener('lostpointercapture', lend);
     root.querySelectorAll('.t-btn').forEach(b => {
       const a = b.dataset.a; let bid = null, last = null;
       b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); bid = e.pointerId; try { b.setPointerCapture(bid); } catch (err) {} b.classList.add('on'); last = [e.clientX, e.clientY];
@@ -51,7 +52,7 @@ export class Input {
       // fire button also allows looking while dragging
       b.addEventListener('pointermove', e => { if (e.pointerId !== bid || a !== 'fire' || !last) return; this.lookX += (e.clientX - last[0]) * 0.006 * this.sens; this.lookY += (e.clientY - last[1]) * 0.006 * this.sens; last = [e.clientX, e.clientY]; });
       const up = e => { if (e.pointerId !== bid) return; bid = null; b.classList.remove('on'); if (a !== 'sprint') this.down.delete(a); };
-      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
+      b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
     });
   }
   showTouch(v) { if (this.touchRoot) this.touchRoot.style.display = v && IS_TOUCH ? 'block' : 'none'; }
@@ -65,6 +66,6 @@ export class Input {
   isDown(a) { return this.down.has(a); }
   wasPressed(a) { if (this.pressed.has(a)) { this.pressed.delete(a); return true; } return false; }
   consumeLook() { const r = [this.lookX, this.lookY]; this.lookX = this.lookY = 0; return r; }
-  clear() { this.pressed.clear(); this.down.delete('fire'); this.lookX = this.lookY = 0; }
+  clear() { this.pressed.clear(); this.down.clear(); this.lookX = this.lookY = 0; this.joy.x = this.joy.y = 0; if (this._resetJoy) this._resetJoy(); }
   unlock() { if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock(); }
 }

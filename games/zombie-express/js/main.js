@@ -295,6 +295,7 @@ const input = new Input(canvas, document.getElementById('touch'));
 if (IS_TOUCH) document.body.classList.add('touch');
 { const sb = document.querySelector('.t-special'); if (sb) sb.textContent = '👊'; }
 input.onUnlock = () => { if (state === 'play') pause(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') pause(); });
 
 let state = 'menu', level = 1, S = null, ambient = null;
 const enemies = [], pickups = [], survivors = [], projs = [];
@@ -428,7 +429,7 @@ function hurtZombie(e, dmg, at, dir, head) {
   if (e.hp <= 0) killZombie(e, head);
 }
 function killZombie(e, head) {
-  e.state = 'die'; e.st = 0; S.kills++; if (S.obj === 'clear' && coachOf(e.g.position.z) === S.coach) S.coachKills++;
+  e.state = 'die'; e.st = 0; S.kills++; if (S.obj === 'clear' && coachOf(e.g.position.z) <= S.coach) S.coachKills++;
   const c = e.boss ? 200 + level * 6 : ({ walker: 2, runner: 3, brute: 7, bloater: 4 }[e.type] + Math.floor(level / 20)); S.coins += c;
   sound.scream(e.boss ? 2 : 0.5); splat(e.g.position.x, e.g.position.z);
   if (head && !e.boss) { e.P.head.visible = false; bloodAt(tmpV.set(e.g.position.x, e.headY, e.g.position.z), tmpV2.set(0, 1, 0), 30, true); }
@@ -469,7 +470,7 @@ function endScreen() {
   else if (level === LEVELS) ui.show('final');
   else ui.result(true, `Run <b>${level}</b> complete · Zombies killed: <b>${S.kills}</b>${survivors.length ? ` · Survivors saved: <b>${survivors.filter(s => !s.dead).length}/${survivors.length}</b>` : ''}<br>Coins earned: 🪙 <b>${S.coins}</b> · Total: 🪙 <b>${ui.save.d.coins}</b>`, S.stars);
 }
-function pause() { if (state !== 'play') return; state = 'paused'; input.enabled = false; input.unlock(); input.showTouch(false); ui.show('pause'); document.querySelector('.p-info').innerHTML = 'Run ' + level + ' — ' + levelName(level); }
+function pause() { if (state !== 'play') return; state = 'paused'; input.enabled = false; player.vel.x = player.vel.z = 0; input.unlock(); input.showTouch(false); ui.show('pause'); document.querySelector('.p-info').innerHTML = 'Run ' + level + ' — ' + levelName(level); }
 function resume() { state = 'play'; ui.show('none'); input.enabled = true; input.showTouch(true); input.clear(); lastT = performance.now(); }
 function quit() { state = 'menu'; disposeEntities(); input.enabled = false; input.unlock(); input.showTouch(false); ui.hudOn(false); if (ambient) { ambient.stop(); ambient = null; } setupMenu(); }
 // window face jump scare
@@ -506,6 +507,8 @@ function update(dt) {
     else if ((input.isDown('fire') || firePressed) && S.fireCd <= 0) { if (ws.clip > 0) fire(); else { sound.click(); S.fireCd = 0.3; if (ws.res <= 0) ui.msg('', 'Out of ammo — switch weapon or find ammo boxes!', 1.5); } }
   }
   if (input.wasPressed('special') && S.shoveCd <= 0 && !S.done) shove();
+  // never soft-lock on ammo: if every owned gun is completely empty and no ammo box is lying around, drop one close by
+  if (!S.done && S.reloadT <= 0 && Object.values(S.ws).every(w => !w.own || (w.clip <= 0 && w.res <= 0)) && !pickups.some(p => p.type === 'ammo')) { S.dryT = (S.dryT || 0) + dt; if (S.dryT > 2.5) { S.dryT = 0; const z = player.pos.z - 2.2 > zLow() + 0.6 ? player.pos.z - 2.2 : player.pos.z + 1.8; spawnPickup('ammo', rr(-0.4, 0.4), z); ui.msg('', 'An ammo box slid out from under a seat!', 1.8); } } else S.dryT = 0;
   muzL.intensity = Math.max(0, muzL.intensity - dt * 60); S.flashT = (S.flashT || 0) - dt; flashSp.visible = flashStar.visible = S.flashT > 0;
   // spawning
   const alive = enemies.filter(e => e.state !== 'die' && !e.boss).length;
@@ -661,7 +664,7 @@ function frame(now) {
   post.render(now / 1000);
   if (ui.save.s.fps) { fpsAcc += rdt; fpsN++; if (fpsAcc > 0.5) { ui.set('.h-fps', Math.round(fpsN / fpsAcc) + ' FPS'); fpsAcc = 0; fpsN = 0; } } else ui.set('.h-fps', '');
 }
-window.__game = { fire, castShot, input, shake, get state() { return state; }, get S() { return S; }, player, enemies, survivors, startLevel, win, ui, spawnZombie, camera, renderer, faceScare, doors };
+window.__game = { sound, fire, castShot, input, shake, get state() { return state; }, get S() { return S; }, player, enemies, survivors, startLevel, win, ui, spawnZombie, camera, renderer, faceScare, get doors() { return doors; }, get valves() { return valves; }, get zFront() { return zFront; }, get nC() { return nC; }, zLow, hurtPlayer, get pickups() { return pickups; }, get level() { return level; }, CL };
 applyQuality();
 setupMenu();
 requestAnimationFrame(frame);
