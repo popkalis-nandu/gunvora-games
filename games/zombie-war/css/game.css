@@ -31,3 +31,22 @@
 .hud-tc .big{color:#ffe2c2}
 .bossbar{top:96px;width:min(520px,50vw)}
 @media (max-width:700px),(max-height:500px){.bossbar{top:84px}}
+/* portrait phones: keep HUD and touch buttons from overlapping */
+@media (orientation:portrait) and (max-width:620px){
+.hud-tc{top:23vh;width:80vw}.hud-tc .big{font-size:20px}.bossbar{top:calc(23vh + 34px)!important;width:70vw}
+.obj{max-width:52vw}
+#ammoBox{left:auto!important;right:14px!important;transform:none!important;top:150px;bottom:auto!important;text-align:right!important}#ammoBox .ammo b{font-size:26px!important}
+#touch .tb[data-btn=reload]{right:calc(4vw + 100px)!important;bottom:5vh!important}
+#touch .tb[data-btn=nade]{right:calc(4vw + 100px)!important;bottom:calc(5vh + 76px)!important}
+#touch .tb[data-btn=swap]{right:calc(4vw + 14px)!important;bottom:calc(9vh + 104px)!important}
+#touch .tb[data-btn=use]{right:calc(4vw + 90px)!important;bottom:calc(5vh + 156px)!important}
+#touch .tb[data-btn=run]{left:calc(4vw + 43px)!important;bottom:calc(5vh + 164px)!important}
+#touch .tb[data-btn=pause]{right:calc(50% - 24px)!important}
+#prompt{bottom:34%}
+}
+/* short landscape phones: keep the title/banner, boss bar, bars and pause button apart */
+@media (orientation:landscape) and (max-height:500px){
+.bar{width:min(260px,26vw)}.hud-tc{width:36vw}.hud-tc .big{font-size:clamp(16px,3vw,24px)}
+.bossbar{top:70px!important;width:36vw}.obj{max-width:30vw}
+#touch .tb[data-btn=pause]{right:124px!important}
+}

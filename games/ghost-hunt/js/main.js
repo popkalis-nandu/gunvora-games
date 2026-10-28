@@ -16,6 +16,8 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0x010102); s
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 70); camera.rotation.order = 'YXZ'; scene.add(camera);
 gfx.setup(scene, camera); gfx.grade.uniforms.uTint.value.set(0.92, 1.0, 1.08); gfx.grade.uniforms.uDesat.value = 0.25;
 const sfx = new SFX(); sfx.setVolume(save.vol);
+// unlock WebAudio on the very first tap/click/key anywhere (mobile browsers need a user gesture)
+for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, () => sfx.init(), { once: true, capture: true, passive: true });
 const input = new Input(canvas); input.sens = save.sens;
 const screen = new ScreenFX(gfx);
 const fx = new Particles(scene, 1600, true), blood = new Particles(scene, 500, false);
@@ -39,7 +41,7 @@ const beamGeo = new THREE.ConeGeometry(1.5, 9, 28, 1, true); beamGeo.translate(0
 const beamMat = new THREE.ShaderMaterial({ uniforms: { uColor: { value: new THREE.Color(1, 0.95, 0.85) }, uI: { value: 0.05 }, uTime: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vUv=uv; vP=position; vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }`,
   fragmentShader: `uniform vec3 uColor; uniform float uI,uTime; varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float along=clamp(-vP.z/9.0,0.0,1.0); float soft=pow(abs(dot(vN,vV)),1.5); float dust=0.75+0.25*sin(vP.z*3.0+uTime*0.7+vP.x*5.0); gl_FragColor=vec4(uColor*uI*soft*dust*pow(1.0-along,2.2),1.0); }` });
-const beam = new THREE.Mesh(beamGeo, beamMat); beam.position.set(0.24, -0.2, -0.55); beam.rotation.set(0.012, -0.005, 0); beam.renderOrder = 20; camera.add(beam);
+const beam = new THREE.Mesh(beamGeo, beamMat); beam.position.set(0.24, -0.2, -0.55); beam.renderOrder = 20; camera.add(beam);
 // dust motes
 const DUST = 260, dustPos = new Float32Array(DUST * 3); for (let i = 0; i < DUST * 3; i++) dustPos[i] = rand(-6, 6);
 const dustGeo = new THREE.BufferGeometry(); dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
@@ -261,7 +263,8 @@ function updatePlayer(dt) {
   // medkit
   if ((input.was('med') || input.was('KeyQ')) && player.med > 0 && player.hp < player.maxHp) { player.med--; player.hp = Math.min(player.maxHp, player.hp + 50); sfx.pickup(0.5); toast('+50 HEALTH', 1000); }
   // flashlight & beam
-  const firing = (input.held('fire') || keyHeld('Space')) && player.bat > 0;
+  if (input.was('fire') || input.was('Space')) player.beamTap = 0.18; else player.beamTap = Math.max(0, (player.beamTap || 0) - dt); // a quick tap still fires a short beam
+  const firing = (input.held('fire') || keyHeld('Space') || player.beamTap > 0) && player.bat > 0;
   const lowBat = player.bat / player.maxBat;
   const drain = firing ? 9 * (1 - upg('battery') * 0.08) : 0.55 * (1 - upg('battery') * 0.08);
   player.bat = Math.max(0, player.bat - drain * dt);
@@ -276,18 +279,51 @@ function updatePlayer(dt) {
     I *= clamp(Math.pow(d / 3.6, 1.6), 0.08, 1); }
   torch.intensity += (I - torch.intensity) * Math.min(1, dt * 18);
   torch.color.set(firing ? 0xb98aff : 0xfff1dc); torch.angle = firing ? 0.3 : 0.46;
-  beamMat.uniforms.uColor.value.set(firing ? 0xa070ff : 0xfff0d8); beamMat.uniforms.uI.value = (firing ? 0.035 : 0.0) * (torch.intensity / 30); beam.visible = firing; beamMat.uniforms.uTime.value += dt; beam.scale.set(firing ? 0.68 : 1, firing ? 0.68 : 1, 1);
+  beamMat.uniforms.uColor.value.set(firing ? 0xa070ff : 0xfff0d8); beamMat.uniforms.uI.value = (firing ? 0.035 : 0.0) * (torch.intensity / 30); beam.visible = firing; beamMat.uniforms.uTime.value += dt;
   torchModel.lens.material.color.setRGB(firing ? 2 : 3, firing ? 1 : 2.8, firing ? 4 : 2.5).multiplyScalar(torch.intensity / 30);
+  // UV beam: aimed exactly through the crosshair (or the mouse cursor while the pointer isn't locked)
+  camera.updateMatrixWorld(); const [ax, ay] = input.shotAim(false); bRC.setFromCamera(bNdc.set(ax, ay), camera); bO.copy(bRC.ray.origin); bD.copy(bRC.ray.direction);
+  const reach = wallT(bO, bD, BEAM_R); let beamLen = reach, any = false, hitT = -1;
   if (firing) {
     if (Math.random() < dt * 14) sfx.click(rand(5000, 8000), 0.03);
-    camera.getWorldDirection(fwd);
     const dps = 55 * (1 + upg('beam') * 0.25);
-    const test = (center, rad, obj) => { v3.copy(center).sub(camera.position); const d = v3.length(); if (d > 14) return false; const ang = Math.acos(clamp(v3.dot(fwd) / d, -1, 1)); if (ang > 0.2 + rad / d) return false; if (!world.los(camera.position.x, camera.position.z, center.x, center.z)) return false; obj.damage(dps * dt, ctx); if (Math.random() < 0.5) fx.emit(center, { count: 2, color: 0xc28bff, color2: 0xffffff, speed: 2.5, life: 0.5, size: 0.12, jitter: 0.5 }); return true; };
-    let any = false; for (const g of ghosts) if (g.state !== 'dying' && g.alpha > 0.2) any = test(g.g.position.clone().setY(1.3), 0.35, g) || any;
-    if (boss && boss.state !== 'dying') any = test(boss.center(), 0.7, boss) || any;
-    if (lurker && lurker.phase === 'lurk') { v3.copy(lurker.g.g.position).sub(camera.position); }
-    $('#cross').classList.toggle('hit', any);
-  } else $('#cross').classList.remove('hit');
+    bR.setFromMatrixColumn(camera.matrixWorld, 0).normalize(); bU.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    const targets = []; for (const g of ghosts) if (g.state !== 'dying' && g.alpha > 0.2) targets.push(g); if (boss && boss.state !== 'dying') targets.push(boss);
+    for (const tg of targets) {
+      const t = beamHit(tg, reach); if (t < 0) continue; any = true; if (hitT < 0 || t < hitT) hitT = t;
+      tg.damage(dps * dt, ctx); if (Math.random() < 0.5) fx.emit(bTmp.copy(bO).addScaledVector(bD, t), { count: 2, color: 0xc28bff, color2: 0xffffff, speed: 2.5, life: 0.5, size: 0.12, jitter: 0.3 });
+    }
+    lastBeam = { o: bO.toArray(), d: bD.toArray(), reach, hit: any, t: hitT, time: cur.time };
+  }
+  // the visible beam and the UV spotlight point at exactly the same aim point that does the damage
+  const aimDist = Math.max(1.2, any ? hitT : beamLen); bTmp.copy(bO).addScaledVector(bD, Math.min(aimDist, BEAM_R)); camera.worldToLocal(bTmp);
+  if (firing) { torchTarget.position.copy(bTmp); const dl = bTmp.clone().sub(beam.position); const L = dl.length(); beam.quaternion.setFromUnitVectors(BEAM_FWD, dl.normalize()); const sz = clamp(L / 9, 0.12, 1.6); beam.scale.set(BEAM_W * sz, BEAM_W * sz, sz); }
+  else torchTarget.position.set(0.05, -0.12, -6);
+  $('#cross').classList.toggle('hit', any);
+}
+const bRC = new THREE.Raycaster(), bHits = [], bO = new THREE.Vector3(), bD = new THREE.Vector3(), bR = new THREE.Vector3(), bU = new THREE.Vector3(), bTmp = new THREE.Vector3(), bC = new THREE.Vector3(), bRay = new THREE.Vector3(), bNdc = new THREE.Vector2();
+const BEAM_A = 0.06, BEAM_R = 14, BEAM_FWD = new THREE.Vector3(0, 0, -1), BEAM_W = Math.tan(BEAM_A) * 9 / 1.5; let lastBeam = null;
+// distance along a ray to the first wall / door / tall prop (props with a height only block below it), floor or ceiling
+function wallT(o, d, maxT) {
+  let best = maxT; if (d.y < -1e-4) best = Math.min(best, -o.y / d.y); else if (d.y > 1e-4) best = Math.min(best, (WALL_H - o.y) / d.y);
+  for (const c of world.colliders) { if (!c.on) continue; let t0 = 0, t1 = best;
+    for (const [oo, dd, a, b] of [[o.x, d.x, c.x0, c.x1], [o.z, d.z, c.z0, c.z1]]) { if (Math.abs(dd) < 1e-6) { if (oo < a || oo > b) { t0 = 1e9; break; } continue; } let ta = (a - oo) / dd, tb = (b - oo) / dd; if (ta > tb) [ta, tb] = [tb, ta]; t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); }
+    if (t0 > t1 || t0 >= best) continue;
+    if (c.h) { const y0 = o.y + d.y * t0, y1 = o.y + d.y * t1; if (y0 < c.h) best = t0; else if (y1 < c.h) best = Math.min(best, (c.h - o.y) / d.y); }
+    else best = t0; }
+  return Math.max(0.05, best);
+}
+function shownIn(o, root) { for (let q = o; q; q = q.parent) { if (!q.visible) return false; if (q === root) return true; } return false; }
+// the beam is a narrow cone (half-angle BEAM_A): centre ray + two rings of rays against the target's visible animated meshes
+const BEAM_PAT = [[0, 0]]; for (let i = 0; i < 6; i++) BEAM_PAT.push([Math.cos(i / 6 * 6.283) * 0.5, Math.sin(i / 6 * 6.283) * 0.5]); for (let i = 0; i < 10; i++) BEAM_PAT.push([Math.cos((i + 0.5) / 10 * 6.283), Math.sin((i + 0.5) / 10 * 6.283)]);
+function beamHit(tg, reach) {
+  const root = tg.g; root.updateMatrixWorld(true); const sc = root.scale.y || 1; bC.set(root.position.x, root.position.y + 1.05 * sc, root.position.z); const rad = (tg.body ? 1.6 : 1.1) * sc;
+  bTmp.subVectors(bC, bO); const dist = bTmp.length(); if (dist - rad > reach) return -1; if (dist > rad && Math.acos(clamp(bTmp.dot(bD) / dist, -1, 1)) - Math.asin(Math.min(1, rad / dist)) > BEAM_A) return -1;
+  let best = -1;
+  for (const [px, py] of BEAM_PAT) { bRay.copy(bD).addScaledVector(bR, px * BEAM_A).addScaledVector(bU, py * BEAM_A).normalize();
+    const lim = px || py ? wallT(bO, bRay, BEAM_R) : reach; bRC.set(bO, bRay); bRC.near = 0; bRC.far = lim; bHits.length = 0; bRC.intersectObject(root, true, bHits);
+    for (const h of bHits) { if (!h.object.isMesh || !shownIn(h.object, root) || h.object.userData.noHit) continue; if (best < 0 || h.distance < best) best = h.distance; break; } }
+  return best;
 }
 
 /* ---------- interactions & pickups ---------- */
@@ -326,6 +362,7 @@ function updateInteract(dt) {
 const mm = $('#minimap').getContext('2d'); let mmT = 0, hudT = 0;
 const emfLeds = [...document.querySelectorAll('.emf i')];
 function updateHUD(dt) {
+  input.placeCross();
   hudT -= dt; if (hudT > 0) return; hudT = 0.08;
   $('#hpBar').style.width = `${player.hp / player.maxHp * 100}%`; $('#batBar').style.width = `${player.bat / player.maxBat * 100}%`; $('#stBar').style.width = `${player.st * 100}%`;
   $('#lvlLbl').textContent = `LEVEL ${cur.L}`; $('#coinHud').textContent = `◉ ${save.coins + cur.coins}`; $('#medHud').textContent = `✚ ${player.med}`; $('#objective').textContent = objectiveText();
@@ -398,4 +435,4 @@ setupTitle(); refreshCoins();
 requestAnimationFrame(t => { last = t; frame(t); });
 setTimeout(() => { const l = $('#loading'); l.style.opacity = 0; setTimeout(() => l.remove(), 700); }, 300);
 // test/debug hook
-window.__gh = { get state() { return state; }, get player() { return player; }, get cur() { return cur; }, get world() { return world; }, get ghosts() { return ghosts; }, get boss() { return boss; }, get fps() { return fps; }, startLevel, input, save: () => save, endLevel, spawnLurker, camera, scene, ghostClose() { const g = ghosts[0]; if (!g) return; g.g.position.set(player.x - Math.sin(player.yaw) * 2.2, 0.15, player.z - Math.cos(player.yaw) * 2.2); g.state = 'chase'; g.alpha = 1; }, frameOnce: null, get pickups() { return pickups; }, get patients() { return patients; }, get fuses() { return fuses; }, tp(x, z) { player.x = x; player.z = z; }, ctx, gfx, THREE };
+window.__gh = { sfx, get state() { return state; }, get player() { return player; }, get cur() { return cur; }, get world() { return world; }, get ghosts() { return ghosts; }, get boss() { return boss; }, get fps() { return fps; }, startLevel, input, save: () => save, endLevel, spawnLurker, camera, scene, ghostClose() { const g = ghosts[0]; if (!g) return; g.g.position.set(player.x - Math.sin(player.yaw) * 2.2, 0.15, player.z - Math.cos(player.yaw) * 2.2); g.state = 'chase'; g.alpha = 1; }, frameOnce: null, get pickups() { return pickups; }, get patients() { return patients; }, get fuses() { return fuses; }, tp(x, z) { player.x = x; player.z = z; }, get lastBeam() { return lastBeam; }, wallT, ctx, gfx, THREE };

@@ -41,6 +41,8 @@ const envTex = new THREE.PMREMGenerator(gfx.renderer).fromScene(new RoomEnvironm
 vm.scene.environment = envTex; vm.scene.environmentIntensity = 0.55; scene.environment = envTex; scene.environmentIntensity = 0.15;
 const bossL = new THREE.PointLight(0xff5a30, 0, 20, 1.4); scene.add(bossL);
 const sfx = new SFX(); sfx.setVolume(save.vol);
+// unlock WebAudio on the very first tap/click/key anywhere (mobile browsers need a user gesture)
+for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, () => sfx.init(), { once: true, capture: true, passive: true });
 const input = new Input(canvas); input.sens = save.sens; input.touchLook = save.sens;
 let screen;
 const fx = new Particles(scene, 2600, true), smoke = new Particles(scene, 700, false), blood = new Particles(scene, 1000, false);
@@ -203,7 +205,7 @@ function pickType() { const w = P.w; const tot = Object.values(w).reduce((a, b) 
 function spawnZombie(type, near) {
   type = type || pickType(); let pos, rise = true;
   if (near) { pos = near.clone(); }
-  else if (city.exits.length && Math.random() < 0.55) { const e = city.exits[randi(0, city.exits.length - 1)]; const p = e.pts[randi(0, e.pts.length - 1)]; pos = new THREE.Vector3(p[0] + rand(-0.5, 0.5), 0, p[1] + rand(-0.5, 0.5)); rise = false; }
+  else if (city.exits.length && Math.random() < 0.55 && city.exits.some(e => e.pts.every(p => Math.hypot(p[0] - player.x, p[1] - player.z) > 9))) { const ex = city.exits.filter(e => e.pts.every(p => Math.hypot(p[0] - player.x, p[1] - player.z) > 9)); const e = ex[randi(0, ex.length - 1)]; const p = e.pts[randi(0, e.pts.length - 1)]; pos = new THREE.Vector3(p[0] + rand(-0.5, 0.5), 0, p[1] + rand(-0.5, 0.5)); rise = false; } // never stream in on top of a player standing at a street exit
   else { pos = city.randomSpot(11, player, 30); for (let k = 0; k < 6; k++) { fwd.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)); const dx = pos.x - player.x, dz = pos.z - player.z; if ((dx * fwd.x + dz * fwd.z) / Math.hypot(dx, dz) < 0.5) break; pos = city.randomSpot(11, player, 30); } }
   const z = new Zombie(scene, type, pos, P, { rise }); zombies.push(z); if (rise) { sfx.groan(0.35, 0.8); } return z;
 }
@@ -260,26 +262,44 @@ function setWeapon(k) { if (k === player.wpn || !owned().includes(k) || vm.switc
 function cycleWeapon(d) { const o = owned(); if (o.length < 2) return; setWeapon(o[(o.indexOf(player.wpn) + d + o.length) % o.length]); }
 function startReload() { const w = wstat(player.wpn), a = player.ammo[player.wpn]; if (player.reload > 0 || a.mag >= w.mag || a.res <= 0 || vm.switchT > 0) return; player.reload = w.shell ? w.reload : w.reload; vm.reloadT = vm.reloadDur = w.shell ? w.reload : w.reload; sfx.click(500, 0.2); setTimeout(() => sfx.click(900, 0.15), w.reload * 400); }
 function finishReload() { const w = wstat(player.wpn), a = player.ammo[player.wpn]; if (w.shell) { a.mag++; a.res--; sfx.click(1300, 0.2); if (a.mag < w.mag && a.res > 0) { player.reload = w.reload; vm.reloadT = vm.reloadDur = w.reload; } } else { const need = w.mag - a.mag, take = Math.min(need, a.res); a.mag += take; a.res -= take; sfx.click(1600, 0.25); } }
-const ray0 = new THREE.Vector3(), rayD = new THREE.Vector3(), muz = new THREE.Vector3();
+const ray0 = new THREE.Vector3(), rayD = new THREE.Vector3(), muz = new THREE.Vector3(), aimBase = new THREE.Vector3(), aimR = new THREE.Vector3(), aimU = new THREE.Vector3();
+const aimRC = new THREE.Raycaster(), aimNdc = new THREE.Vector2();
+// the exact ray through the crosshair (screen centre) or, while the pointer isn't locked, through the visible mouse cursor
+function aimRay(o, d, take) { camera.updateMatrixWorld(); const [ax, ay] = input.shotAim(take); aimRC.setFromCamera(aimNdc.set(ax, ay), camera); o.copy(aimRC.ray.origin); d.copy(aimRC.ray.direction); return d; }
+// nearest enemy (visible animated meshes) along a ray, limited by world geometry
+function castShot(o, d, range) {
+  const wr = city.ray(o, d, range); let best = null, bt = wr.t;
+  for (const z of zombies) { const h = z.rayHit(o, d, bt); if (h && h.t < bt) { bt = h.t; best = { z, part: h.part }; } }
+  if (boss) { const h = boss.rayHit(o, d, bt); if (h && h.t < bt) { bt = h.t; best = { z: boss, part: h.part }; } }
+  return { t: bt, best, wr };
+}
+// gun muzzle as seen on screen (viewmodel is drawn with its own camera) mapped into the world, so tracers leave the barrel
+function muzzleOnScreen(out) {
+  vm.root.updateMatrixWorld(true); vm.cam.updateMatrixWorld(); const g = vm.guns[vm.cur]; out.copy(g.userData.muzzle).applyMatrix4(g.matrixWorld);
+  const dist = out.length(); out.project(vm.cam); out.z = 0.5; out.unproject(camera).sub(camera.position).normalize(); return out.multiplyScalar(Math.max(0.3, dist)).add(camera.position);
+}
+let bloom = 0, lastShotT = -9;
 function fire() {
   const w = wstat(player.wpn), a = player.ammo[player.wpn];
   if (a.mag <= 0) { sfx.click(300, 0.2); player.cd = 0.25; startReload(); return; }
   if (player.reload > 0) { if (w.shell) { player.reload = 0; vm.reloadT = 0; } else return; }
   a.mag--; player.cd = 60 / w.rpm; cur.shots++;
-  sfx.gun(w.snd, 0.9); vm.fire(w); screen.shake(w.recoil * 0.08);
-  player.kick += w.kick * (player.ads ? 0.6 : 1); player.kickY += rand(-1, 1) * w.kick * 0.4;
-  camera.updateMatrixWorld(); vm.root.updateMatrixWorld(true); vm.muzzleWorld(camera, muz);
-  muzL.position.copy(muz); muzL.intensity = 18; muzT = 0.05;
-  const moving = Math.hypot(player.vx, player.vz) > 1; const spread = w.spread * (player.ads ? 0.4 : 1) * (moving ? 1.5 : 1) * (w.pellets > 1 ? 1 : 1 + vm.recoil * 0.6);
-  ray0.copy(camera.position); let anyHit = false, killed = false;
-  const assist = isTouch && save.assist ? 1.35 : 1;
+  sfx.gun(w.snd, 0.9); vm.fire(w);
+  aimRay(ray0, aimBase, true); aimR.setFromMatrixColumn(camera.matrixWorld, 0).normalize(); aimU.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+  muzzleOnScreen(muz); muzL.position.copy(muz); muzL.intensity = 18; muzT = 0.05;
+  // accuracy: the first shot (or one after a short pause) is pinpoint; only sustained full-auto fire blooms a little
+  const now = cur.time || 0; bloom = now - lastShotT > Math.max(0.3, 60 / w.rpm * 2.2) ? 0 : Math.min(1, bloom + (w.auto ? 0.12 : 0.25)); lastShotT = now;
+  let anyHit = false, killed = false; const shots = [];
   for (let i = 0; i < w.pellets; i++) {
-    rayD.set(rand(-1, 1) * spread, rand(-1, 1) * spread, -1).normalize().applyQuaternion(camera.quaternion);
-    const wr = city.ray(ray0, rayD, w.range); let best = null, bt = wr.t;
-    for (const z of zombies) { const h = z.rayHit(ray0, rayD, bt, assist); if (h && h.t < bt) { bt = h.t; best = { z, part: h.part }; } }
-    if (boss) { const h = boss.rayHit(ray0, rayD, bt, assist); if (h && h.t < bt) { bt = h.t; best = { z: boss, part: h.part }; } }
+    let r = 0, an = 0;
+    if (w.pellets > 1) { if (i > 0) { const ring = i % 2 ? 0.35 : 1; an = (i - 1) / (w.pellets - 1) * Math.PI * 2 + rand(-0.15, 0.15); r = w.spread * ring * (player.ads ? 0.75 : 1) * rand(0.9, 1.05); } } // tight centred shotgun pattern: exact centre pellet + two rings
+    else if (bloom > 0) { an = rand(0, Math.PI * 2); r = w.spread * bloom * (player.ads ? 0.4 : 1) * Math.sqrt(Math.random()); }
+    rayD.copy(aimBase).addScaledVector(aimR, Math.cos(an) * r).addScaledVector(aimU, Math.sin(an) * r).normalize();
+    const { t: bt, best, wr } = castShot(ray0, rayD, w.range);
     const hp = v4.copy(ray0).addScaledVector(rayD, bt);
+    shots.push({ x: hp.x, y: hp.y, z: hp.z, t: bt, hit: best ? (best.z === boss ? 'boss' : best.z.type) : null, part: best ? best.part : null });
     if (i < 3) tracer(muz, hp);
+    fx.emit(hp, { count: 2, color: 0xffe0a0, color2: 0xffa040, speed: 0.6, life: 0.09, size: best ? 0.07 : 0.09 }); // impact flash exactly at the hit point
     if (best) {
       const fall = bt > w.range * 0.5 ? 1 - (bt - w.range * 0.5) / (w.range * 0.5) * 0.5 : 1;
       const res = best.z.damage(w.dmg * fall, best.part, rayD, ctx, { force: w.force || 0.4, headMul: player.wpn === 'rifle' ? 2.8 : 2.4 });
@@ -289,13 +309,25 @@ function fire() {
       if (wr.c && wr.c.kind === 'barrel') { const b = city.barrels.find(x => x.col === wr.c); if (b && b.alive) { b.hp -= w.dmg; fx.emit(hp, { count: 10, color: 0xff6010, speed: 3, life: 0.4, size: 0.1 }); if (b.hp <= 0) pending.push({ t: 0.05, fn: () => blowBarrel(b) }); } }
     }
   }
+  lastShot = { wpn: player.wpn, origin: ray0.toArray(), dir: aimBase.toArray(), shots, bloom, n: (lastShot ? lastShot.n : 0) + 1 };
+  // recoil is applied AFTER the shot has been resolved (next frame), never before it
+  screen.shake(w.recoil * 0.08); player.kick += w.kick * (player.ads ? 0.6 : 1); player.kickY += rand(-1, 1) * w.kick * 0.4;
   if (anyHit) { cur.hits++; hitMark(killed); }
-  if (a.mag === 0 && a.res > 0) setTimeout(() => { if (state === 'playing') startReload(); }, 250);
+  if (a.mag === 0 && a.res > 0) pending.push({ t: 0.25, fn: () => { if (player.ammo[player.wpn].mag === 0) startReload(); } });
 }
+let lastShot = null, shakeDone = false;
 let muzT = 0;
 function throwNade() {
   if (player.nades <= 0 || vm.nadeT > 0 || vm.switchT > 0) return; player.nades--; vm.nadeT = 0.6; sfx.click(700, 0.2);
-  setTimeout(() => { if (state !== 'playing' || !city) return; fwd.set(0, 0.25, -1).normalize().applyQuaternion(camera.quaternion); const m = new THREE.Mesh(nadeGeo, nadeMat); m.position.copy(camera.position).addScaledVector(fwd, 0.5); m.castShadow = ENT.shadows; scene.add(m); nades.push({ m, v: fwd.clone().multiplyScalar(15).add(v3.set(player.vx, 0, player.vz)), t: 1.8 }); }, 250);
+  pending.push({ t: 0.25, fn: () => { if (!city) return; aimRay(v4, fwd); const aimO = v4.clone(), aimD = fwd.clone();
+    const m = new THREE.Mesh(nadeGeo, nadeMat); m.position.copy(camera.position).addScaledVector(aimD, 0.35); m.castShadow = ENT.shadows; scene.add(m);
+    // lob the grenade so it lands where the crosshair points (ground under the aimed zombie / wall / street), not far behind it
+    const { t: ht, best } = castShot(aimO, aimD, 28); let v;
+    if (ht < 27.5) { const tg = aimO.clone().addScaledVector(aimD, best ? ht : Math.max(0.5, ht - 0.35)); tg.y = best ? 0.07 : Math.max(0.07, tg.y);
+      const dx = tg.x - m.position.x, dz = tg.z - m.position.z, dh = Math.hypot(dx, dz), T = clamp(dh / 11, 0.35, 1.3);
+      v = new THREE.Vector3(dx / T, (tg.y - m.position.y + 8 * T * T) / T, dz / T); }
+    else v = aimD.addScaledVector(aimU.setFromMatrixColumn(camera.matrixWorld, 1).normalize(), 0.25).normalize().multiplyScalar(15);
+    nades.push({ m, v, t: 1.8 }); } });
 }
 
 /* ---------- player ---------- */
@@ -307,13 +339,16 @@ function updatePlayer(dt) {
   // recoil recovery
   player.pitch += player.kick * 0.25; player.yaw += player.kickY * 0.3; player.recP = Math.min(0.35, (player.recP || 0) + player.kick * 0.75); player.kick = 0; player.kickY = 0; player.recP *= Math.max(0, 1 - dt * (input.held('fire') ? 5 : 9));
   // touch aim assist
-  if (isTouch && save.assist && (input.held('fire') || Math.abs(lx) > 0)) {
-    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion); let best = null, ba = 0.14;
+  // gentle magnetism only: it never enlarges hitboxes and switches off as soon as the crosshair is already on an enemy,
+  // so it can't drag a head shot down to the chest or pull the shot off the target the player is pointing at
+  if (isTouch && !input.mouse && save.assist && city && (input.held('fire') || Math.abs(lx) > 0) && !castShot(camera.position, fwd.set(0, 0, -1).applyQuaternion(camera.quaternion), 60).best) {
+    fwd.set(0, 0, -1).applyQuaternion(camera.quaternion); let best = null, ba = 0.1;
     for (const z of zombies.concat(boss ? [boss] : [])) { if (!z.alive() || z.state === 'intro') continue; z.center(v3); v3.sub(camera.position); const d = v3.length(); if (d > 40) continue; v3.divideScalar(d); const a = Math.acos(clamp(v3.dot(fwd), -1, 1)); if (a < ba && city.los(player.x, player.z, z.x, z.z, 1.5)) { ba = a; best = v3.clone(); } }
-    if (best) { const ty = Math.atan2(-best.x, -best.z), tp = Math.asin(best.y); let dy = ty - player.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; player.yaw += dy * Math.min(1, dt * 3.5); player.pitch += (tp - player.pitch) * Math.min(1, dt * 3); }
+    if (best) { const ty = Math.atan2(-best.x, -best.z), tp = Math.asin(best.y); let dy = ty - player.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; player.yaw += dy * Math.min(1, dt * 2.5); player.pitch += (tp - player.pitch) * Math.min(1, dt * 2); }
   }
+  const trigP = input.was('fire') || input.was('Space'); if (trigP) player.run = false;
   const mv = input.moveVec(); if (input.was('run')) player.run = !player.run;
-  const wantRun = (keyHeld('ShiftLeft') || keyHeld('ShiftRight') || player.run) && mv.y < -0.3 && !ads && !input.held('fire');
+  const wantRun = (keyHeld('ShiftLeft') || keyHeld('ShiftRight') || player.run) && mv.y < -0.3 && !ads && !input.held('fire') && !keyHeld('Space') && !trigP && !(player.fireBuf > 0);
   const running = wantRun && player.st > 0.05; player.running = running;
   player.st = clamp(player.st + (running ? -dt * (0.2 - upg('speed') * 0.02) : dt * 0.2), 0, 1); if (player.st <= 0.05) player.run = false;
   const sp = player.speed * (running ? 1.55 : 1) * (ads ? 0.55 : 1);
@@ -327,7 +362,7 @@ function updatePlayer(dt) {
   const moved = Math.hypot(p.x - player.x, p.z - player.z); player.x = p.x; player.z = p.z;
   player.bob += moved * (running ? 2.4 : 3.0); player.stepD += moved; if (player.stepD > (running ? 0.95 : 0.75)) { player.stepD = 0; sfx.step(running ? 0.25 : 0.15); }
   const bobY = Math.sin(player.bob) * 0.05 * Math.min(1, moved / dt / 3.5);
-  camera.position.set(player.x, 1.65 + bobY, player.z); camera.rotation.set(clamp(player.pitch + (player.recP || 0), -1.45, 1.45), player.yaw, 0);
+  camera.position.set(player.x, 1.65 + bobY, player.z); camera.rotation.set(clamp(player.pitch + (player.recP || 0), -1.45, 1.45), player.yaw, 0); screen.update(dt, camera); shakeDone = true; // shake applied before firing => shots use exactly the view that is rendered
   const fov = 75 - ads * 20 + (running ? 4 : 0); if (Math.abs(camera.fov - fov) > 0.05) { camera.fov += (fov - camera.fov) * Math.min(1, dt * 12); camera.updateProjectionMatrix(); }
   // weapons
   player.cd -= dt;
@@ -336,8 +371,9 @@ function updatePlayer(dt) {
   if (input.was('KeyQ')) setWeapon(player.last); if (input.was('swap')) cycleWeapon(1);
   if (input.was('KeyR') || input.was('reload')) startReload();
   if (input.was('KeyG') || input.was('nade')) throwNade();
-  const w = WEAPONS[player.wpn]; const trig = input.held('fire') || keyHeld('Space'); const trigP = input.was('fire') || input.was('Space');
-  if (!running && vm.switchT <= 0 && vm.nadeT <= 0 && player.cd <= 0 && (w.auto ? trig : trigP)) fire();
+  const w = WEAPONS[player.wpn]; const trig = input.held('fire') || keyHeld('Space');
+  if (trigP) player.fireBuf = 0.22; else player.fireBuf = Math.max(0, (player.fireBuf || 0) - dt); // a quick click/tap between frames or during the cooldown is never lost
+  if (!running && vm.switchT <= 0 && vm.nadeT <= 0 && player.cd <= 0 && (trig && w.auto || player.fireBuf > 0)) { player.fireBuf = 0; fire(); }
   vm.update(dt, { lookX: lx, lookY: ly, ads, sprint: running, bob: player.bob, moving: Math.min(1, moved / dt / 3.5) });
   // use / rescue
   let near = null; for (const s2 of survivors) if (s2.state === 'wait' && Math.hypot(s2.x - player.x, s2.z - player.z) < 2.2) near = s2;
@@ -357,7 +393,8 @@ function updateObjects(dt) {
   // grenades
   for (const n of nades) {
     n.t -= dt; const m = n.m; const o = m.position.clone(); m.position.addScaledVector(n.v, dt); n.v.y -= 16 * dt; m.rotation.x += dt * 10;
-    if (m.position.y < 0.07) { m.position.y = 0.07; if (n.v.y < -2) sfx.click(500, 0.12); n.v.y *= -0.35; n.v.x *= 0.65; n.v.z *= 0.65; }
+    if (m.position.y < 0.07) { m.position.y = 0.07; if (n.v.y < -2) sfx.click(500, 0.12); n.v.y *= -0.3; n.v.x *= 0.3; n.v.z *= 0.3; }
+    if (m.position.y < 0.09) { const fr = Math.max(0, 1 - dt * 7); n.v.x *= fr; n.v.z *= fr; } // ground friction: grenades stop close to where they land
     const p = v3.copy(m.position); city.collide(p, 0.08); if (Math.abs(p.x - m.position.x) > 1e-4) n.v.x *= -0.5; if (Math.abs(p.z - m.position.z) > 1e-4) n.v.z *= -0.5; m.position.x = p.x; m.position.z = p.z;
     if (Math.random() < 0.5) fx.emit(m.position, { count: 1, color: 0xff4020, speed: 0.2, life: 0.2, size: 0.05 });
     if (n.t <= 0) { scene.remove(m); explode(m.position, 6.5, 190 * (1 + upg('dmg') * 0.15) * (1 + P.t), 'player'); }
@@ -414,6 +451,7 @@ function updateMission(dt) {
 /* ---------- HUD ---------- */
 const radar = $('#radar'), rctx = radar.getContext('2d'); let hudT = 0;
 function updateHUD(dt) {
+  input.placeCross();
   $('#hpBar').style.width = (player.hp / player.maxHp * 100) + '%'; $('#stBar').style.width = (player.st * 100) + '%';
   const w = wstat(player.wpn), a = player.ammo[player.wpn]; $('#wName').textContent = WEAPONS[player.wpn].name; const mg = $('#aMag'); mg.textContent = a.mag; mg.classList.toggle('low', a.mag <= Math.ceil(w.mag * 0.25)); $('#aRes').textContent = '/ ' + (a.res === Infinity ? '∞' : a.res); $('#nadeHud').textContent = '● '.repeat(Math.min(8, player.nades)) + (player.nades ? '' : '— no grenades');
   const rh = $('#reloadHint'); const needR = a.mag === 0 || (a.mag <= Math.ceil(w.mag * 0.25) && a.res > 0); rh.style.display = needR && player.reload <= 0 ? 'block' : 'none'; rh.textContent = a.mag === 0 && a.res <= 0 ? 'NO AMMO – SWITCH WEAPON' : player.reload > 0 ? '' : (isTouch ? 'RELOAD' : 'R – RELOAD');
@@ -483,7 +521,7 @@ function frame(now) {
   for (const tr of tracers) if (tr.life > 0) { tr.life -= dt; if (tr.life <= 0) tr.m.visible = false; }
   for (const r of rings) if (r.t < 1) { r.t = Math.min(1, r.t + dt * 2.5); const s = r.r * (0.2 + r.t); r.m.scale.set(s, 1, s); r.m.material.opacity = 1 - r.t; if (r.t >= 1) r.m.visible = false; }
   fx.update(dt); smoke.update(dt); blood.update(dt); updateDecals(dt);
-  screen.update(dt, camera);
+  if (!shakeDone) screen.update(dt, camera); shakeDone = false;
   gfx.render(t);
   input.endFrame();
   frames++; fpsT += dt; if (fpsT > 1) { fps = frames / fpsT; frames = 0; fpsT = 0; }
@@ -493,4 +531,4 @@ function frame(now) {
 setupTitle(); refreshCoins();
 requestAnimationFrame(t => { last = t; frame(t); });
 setTimeout(() => { const l = $('#loading'); l.style.opacity = 0; setTimeout(() => l.remove(), 700); }, 300);
-window.__zw = { get state() { return state; }, get player() { return player; }, get cur() { return cur; }, get mis() { return mis; }, get city() { return city; }, get zombies() { return zombies; }, get boss() { return boss; }, get pickups() { return pickups; }, get survivors() { return survivors; }, get fps() { return fps; }, get P() { return P; }, startLevel, endLevel, spawnZombie, explode, ctx, input, camera, scene, gfx, vm, save: () => save, setSave(o) { Object.assign(save, o); persist(); }, tp(x, z) { player.x = x; player.z = z; }, THREE };
+window.__zw = { sfx, get state() { return state; }, get player() { return player; }, get cur() { return cur; }, get mis() { return mis; }, get city() { return city; }, get zombies() { return zombies; }, get boss() { return boss; }, get pickups() { return pickups; }, get survivors() { return survivors; }, get fps() { return fps; }, get P() { return P; }, startLevel, endLevel, spawnZombie, explode, ctx, input, camera, scene, gfx, vm, save: () => save, setSave(o) { Object.assign(save, o); persist(); }, tp(x, z) { player.x = x; player.z = z; }, get lastShot() { return lastShot; }, get screen() { return screen; }, setWeapon, get nades() { return nades; }, THREE };

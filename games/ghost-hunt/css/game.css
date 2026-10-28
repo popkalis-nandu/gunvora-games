@@ -16,3 +16,17 @@
 #cross.dot{width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:rgba(255,255,255,.7);box-shadow:0 0 4px #000}
 #cross.dot::before,#cross.dot::after{display:none}
 #note{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-2deg);max-width:min(420px,80vw);background:#e8dfc6;color:#3a2a1a;padding:18px 22px;font-family:'Courier New',monospace;font-size:15px;line-height:1.45;box-shadow:0 10px 40px #000;z-index:25;display:none;border-radius:2px;white-space:pre-line}
+/* portrait phones: keep HUD from overlapping */
+@media (orientation:portrait) and (max-width:620px){
+.hud-tc{top:25vh;width:80vw}.hud-tc .big{font-size:20px}.bossbar{top:calc(25vh + 34px)!important;width:70vw}
+.obj{max-width:52vw}
+#touch .tb[data-btn=pause]{right:calc(50% - 24px)!important}
+#touch .tb[data-btn=run]{bottom:calc(8vh + 104px)!important}
+#prompt{bottom:30%}
+}
+/* short landscape phones: keep the title/banner, boss bar, bars and pause button apart */
+@media (orientation:landscape) and (max-height:500px){
+.bar{width:min(260px,26vw)}.hud-tc{width:36vw}.hud-tc .big{font-size:clamp(16px,3vw,24px)}
+.bossbar{top:70px!important;width:36vw}.obj{max-width:30vw}
+#touch .tb[data-btn=pause]{right:124px!important}
+}

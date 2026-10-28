@@ -242,7 +242,7 @@ export class World {
   local(s, lx, lz) { const c = Math.cos(s.rot), sn = Math.sin(s.rot); return [s.x + lx * c + lz * sn, s.z - lx * sn + lz * c]; }
   prop(what, s) {
     const B = this.B, rot = s.rot, P = (lx, y, lz) => { const [x, z] = this.local(s, lx, lz); return [x, y, z]; };
-    const colBox = (w, d, lz = 0) => { const sw = Math.abs(Math.sin(rot)) > 0.5; const hw = (sw ? d : w) / 2, hd = (sw ? w : d) / 2; const [cx, cz] = this.local(s, 0, lz); this.addCol(cx - hw, cx + hw, cz - hd, cz + hd); };
+    const colBox = (w, d, lz = 0, h = 0) => { const sw = Math.abs(Math.sin(rot)) > 0.5; const hw = (sw ? d : w) / 2, hd = (sw ? w : d) / 2; const [cx, cz] = this.local(s, 0, lz); this.addCol(cx - hw, cx + hw, cz - hd, cz + hd, h ? { h } : undefined); };
     if (what === 'bed') {
       // bed head at wall (local -z toward wall... slot rot faces into room, local +z = into room)
       const metal = 0x8a8f8c; const lz = -0.1;
@@ -252,7 +252,7 @@ export class World {
       const sheet = this.rng() < 0.4 ? 0xb8a99a : 0xd9d6cc; B.add('cloth', G.box, P(0, 0.62, lz + 0.05), [0, rot, (this.rng() - .5) * 0.06], [0.95, 0.16, 1.85], sheet);
       B.add('cloth', G.box, P(0, 0.75, lz - 0.75), [0.2, rot, 0], [0.6, 0.12, 0.35], 0xe8e4da);
       if (this.rng() < 0.35) this.addDecalFloor(...P(0, 0, lz + 0.3).filter((_, i) => i !== 1), 0, 0.9);
-      colBox(1.1, 2.1, -0.1);
+      colBox(1.1, 2.1, -0.1, 0.9);
     } else if (what === 'iv') {
       B.add('metal', G.cyl6, P(0, 0.9, 0), [0, 0, 0], [0.03, 1.8, 0.03], 0x9a9a9a); B.add('metal', G.box, P(0, 0.03, 0), [0, rot, 0], [0.5, 0.04, 0.05], 0x666666); B.add('metal', G.box, P(0, 0.03, 0), [0, rot + 1.57, 0], [0.5, 0.04, 0.05], 0x666666);
       B.add('glow', G.box, P(0.12, 1.6, 0), [0, rot, 0], [0.12, 0.22, 0.05], this.rng() < 0.5 ? 0x4a0000 : 0x203018);
@@ -262,7 +262,7 @@ export class World {
     } else if (what === 'desk') {
       B.add('wood', G.box, P(0, 0.76, -0.3), [0, rot, 0], [1.6, 0.06, 0.8], 0x5a4030); for (const lx of [-0.75, 0.75]) B.add('wood', G.box, P(lx, 0.38, -0.3), [0, rot, 0], [0.06, 0.76, 0.75], 0x4a3020);
       B.add('dark', G.box, P(-0.3, 0.95, -0.4), [0, rot + 0.1, 0], [0.45, 0.32, 0.05], 0x111111); B.add('cloth', G.box, P(0.35, 0.8, -0.2), [0, rot + 0.4, 0], [0.3, 0.01, 0.4], 0xe8e2d0);
-      this.prop('chair', { ...s, x: this.local(s, 0, 0.5)[0], z: this.local(s, 0, 0.5)[1], rot: rot + Math.PI + 0.4 }); colBox(1.6, 0.8, -0.3);
+      this.prop('chair', { ...s, x: this.local(s, 0, 0.5)[0], z: this.local(s, 0, 0.5)[1], rot: rot + Math.PI + 0.4 }); colBox(1.6, 0.8, -0.3, 0.85);
     } else if (what === 'chair') {
       B.add('dark', G.box, P(0, 0.45, 0), [0, rot, 0], [0.45, 0.06, 0.45], 0x2a2a30); B.add('dark', G.box, P(0, 0.75, -0.21), [0, rot, 0], [0.45, 0.55, 0.05], 0x2a2a30); B.add('metal', G.cyl6, P(0, 0.22, 0), [0, 0, 0], [0.05, 0.45, 0.05], 0x666666);
     } else if (what === 'drawers') {
@@ -281,7 +281,7 @@ export class World {
       const r0 = rot + (this.rng() - .5); B.add('dark', G.cyl, P(-0.3, 0.32, 0), [0, r0, Math.PI / 2], [0.64, 0.03, 0.64], 0x222222); B.add('dark', G.cyl, P(0.3, 0.32, 0), [0, r0, Math.PI / 2], [0.64, 0.03, 0.64], 0x222222);
       B.add('cloth', G.box, P(0, 0.5, 0), [0, r0, 0], [0.5, 0.06, 0.45], 0x203040); B.add('cloth', G.box, P(0, 0.8, -0.22), [0, r0, 0], [0.5, 0.55, 0.05], 0x203040);
     } else if (what === 'bench') {
-      B.add('wood', G.box, P(0, 0.45, -0.4), [0, rot, 0], [2.2, 0.08, 0.5], 0x4a3a2c); B.add('wood', G.box, P(0, 0.8, -0.62), [0, rot, 0], [2.2, 0.5, 0.06], 0x4a3a2c); for (const lx of [-1, 1]) B.add('metal', G.box, P(lx, 0.22, -0.4), [0, rot, 0], [0.06, 0.44, 0.45], 0x333333); colBox(2.2, 0.6, -0.45);
+      B.add('wood', G.box, P(0, 0.45, -0.4), [0, rot, 0], [2.2, 0.08, 0.5], 0x4a3a2c); B.add('wood', G.box, P(0, 0.8, -0.62), [0, rot, 0], [2.2, 0.5, 0.06], 0x4a3a2c); for (const lx of [-1, 1]) B.add('metal', G.box, P(lx, 0.22, -0.4), [0, rot, 0], [0.06, 0.44, 0.45], 0x333333); colBox(2.2, 0.6, -0.45, 0.6);
     }
   }
   gurney(x, z, rot) { const B = this.B; B.add('metal', G.box, [x, 0.75, z], [0, rot, 0], [0.7, 0.05, 1.9], 0xa0a4a4); B.add('metal', G.box, [x, 0.4, z], [0, rot, 0], [0.6, 0.05, 1.7], 0x777777); const body = this.rng() < 0.6; if (body) { B.add('cloth', G.box, [x, 0.9, z], [0, rot, 0], [0.5, 0.22, 1.7], 0xcfcbc0); B.add('cloth', G.sph, [x - Math.sin(rot) * 0.75, 0.95, z - Math.cos(rot) * 0.75], [0, 0, 0], [0.3, 0.25, 0.3], 0xcfcbc0); } }
@@ -289,7 +289,7 @@ export class World {
     const B = this.B; B.add('metal', G.box, [x, 0.9, z], [0, rot, 0], [0.9, 0.12, 2.1], 0x6d8a90); B.add('metal', G.cyl, [x, 0.45, z], [0, 0, 0], [0.3, 0.9, 0.3], 0x555b5d); B.add('metal', G.box, [x, 0.05, z], [0, rot, 0], [0.8, 0.1, 1.2], 0x444444);
     B.add('cloth', G.box, [x, 1.0, z], [0, rot, 0.03], [0.7, 0.08, 1.6], 0x7a1010);
     B.add('metal', G.cyl6, [x, 2.6, z], [0, 0, 0], [0.06, 1.2, 0.06], 0x777777); B.add('metal', G.cyl, [x, 2.0, z], [0, 0, 0], [1.0, 0.25, 1.0], 0xa0a0a0); B.add('glow', G.cyl, [x, 1.87, z], [0, 0, 0], [0.8, 0.02, 0.8], 0xe8fff0);
-    this.addCol(x - 0.55, x + 0.55, z - 0.55, z + 0.55); this.addDecalFloor(x + 0.5, z + 0.3, 1, 2.5);
+    this.addCol(x - 0.55, x + 0.55, z - 0.55, z + 0.55, { h: 1.1 }); this.addDecalFloor(x + 0.5, z + 0.3, 1, 2.5);
   }
   buildExit() {
     const r = this.exitRoom, sd = this.exitSide, off = ROOM / 2 - T / 2;

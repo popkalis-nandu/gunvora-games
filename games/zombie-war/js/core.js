@@ -278,27 +278,44 @@ export class Input {
   constructor(canvas, ui) {
     this.canvas = canvas; this.keys = {}; this.lookX = 0; this.lookY = 0; this.mx = 0; this.my = 0;
     this.btn = {}; this.pressed = {}; this.enabled = false; this.sens = 1; this.touchLook = 1;
-    this.onPause = null; this.locked = false;
+    this.onPause = null; this.locked = false; this.mouse = !isTouch; let touchT = -1e9;
+    addEventListener('touchstart', () => { touchT = performance.now(); this.mouse = false; }, { capture: true, passive: true });
+    const realMouse = e => !(e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) && performance.now() - touchT > 900;
     addEventListener('keydown', e => { if (!this.keys[e.code]) this.pressed[e.code] = true; this.keys[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown'].includes(e.code) && this.enabled) e.preventDefault(); });
     addEventListener('keyup', e => { this.keys[e.code] = false; });
     addEventListener('blur', () => { this.keys = {}; this.btn = {}; });
+    // aim = NDC point the shot goes through: exact screen centre while the pointer is locked (or on touch),
+    // the visible mouse cursor while it is not (lock pending/denied, e.g. inside an iframe) so clicks never go astray.
+    this.aim = { x: 0, y: 0 };
     canvas.addEventListener('mousedown', e => {
-      if (isTouch && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+      if (!realMouse(e)) return; this.mouse = true;
       if (!this.enabled) return;
-      if (!this.locked && !isTouch) { this.lock(); return; }
+      if (!this.locked) { this.aimAt(e); this.pressAim = { a: [this.aim.x, this.aim.y], t: performance.now() }; this.lock(); } else this.pressAim = null;
       if (e.button === 0) { this.btn.fire = true; this.pressed.fire = true; }
       if (e.button === 2) { this.btn.alt = true; this.pressed.alt = true; }
     });
     addEventListener('mouseup', e => { if (e.button === 0) this.btn.fire = false; if (e.button === 2) this.btn.alt = false; });
     canvas.addEventListener('contextmenu', e => e.preventDefault());
-    addEventListener('mousemove', e => { if (this.locked && this.enabled) { this.lookX += e.movementX * 0.0022 * this.sens; this.lookY += e.movementY * 0.0022 * this.sens; } });
+    addEventListener('mousemove', e => { if (!this.locked && realMouse(e)) { if (e.movementX || e.movementY) this.mouse = true; this.aimAt(e); } if (this.locked && this.enabled) { this.lookX += e.movementX * 0.0022 * this.sens; this.lookY += e.movementY * 0.0022 * this.sens; } });
     document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === canvas;
-      if (!this.locked && this.enabled && this.onPause && !isTouch) this.onPause();
+      const was = this.locked; this.locked = document.pointerLockElement === canvas; if (this.locked) { this.aim.x = 0; this.aim.y = 0; }
+      if (was && !this.locked && this.enabled && this.onPause) this.onPause();
     });
     this.buildTouch(ui);
   }
-  lock() { if (isTouch) return; try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
+  aimAt(e) { const r = this.canvas.getBoundingClientRect(); if (!r.width) return; this.aim.x = clamp((e.clientX - r.left) / r.width * 2 - 1, -1, 1); this.aim.y = clamp(-((e.clientY - r.top) / r.height * 2 - 1), -1, 1); }
+  aimNDC() { return this.locked || !this.mouse ? [0, 0] : [this.aim.x, this.aim.y]; }
+  // aim for a shot: a click made while unlocked keeps its cursor point even if pointer lock kicks in before the next frame
+  shotAim(take) { const p = this.pressAim; if (p && performance.now() - p.t < 350) { if (take) this.pressAim = null; return p.a; } return this.aimNDC(); }
+  get cursorAim() { return !this.locked && this.mouse && this.enabled; }
+  // keep the on-screen crosshair (and hit marker) exactly where the shot will go
+  placeCross(ids = ['#cross', '#hitmark']) {
+    const ca = this.cursorAim, r = ca ? this.canvas.getBoundingClientRect() : null; this.canvas.style.cursor = ca ? 'none' : '';
+    for (const id of ids) { const el = document.querySelector(id); if (!el) continue;
+      if (ca) { el.style.left = (r.left + (this.aim.x + 1) / 2 * r.width) + 'px'; el.style.top = (r.top + (1 - this.aim.y) / 2 * r.height) + 'px'; }
+      else if (el.style.left) { el.style.left = ''; el.style.top = ''; } }
+  }
+  lock() { if (!this.mouse) return; try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
   unlock() { if (document.pointerLockElement) document.exitPointerLock(); }
   buildTouch(ui) {
     const root = document.getElementById('touch'); if (!root) return; this.touchRoot = root;

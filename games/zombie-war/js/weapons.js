@@ -5,7 +5,7 @@ import { rand, clamp, canvasTex } from './core.js';
 export const WEAPONS = {
   pistol: { name: 'M9 PISTOL', dmg: 34, rpm: 330, auto: false, mag: 12, reserve: Infinity, reload: 1.2, spread: 0.012, pellets: 1, recoil: 0.5, kick: 0.016, range: 80, snd: 'pistol', slot: 1 },
   smg: { name: 'MP5 SMG', dmg: 21, rpm: 800, auto: true, mag: 30, reserve: 150, reload: 1.6, spread: 0.032, pellets: 1, recoil: 0.32, kick: 0.007, range: 60, snd: 'smg', slot: 2 },
-  shotgun: { name: 'M870 SHOTGUN', dmg: 17, rpm: 72, auto: false, mag: 6, reserve: 36, reload: 0.48, shell: true, spread: 0.075, pellets: 9, recoil: 1.5, kick: 0.05, range: 32, snd: 'shotgun', slot: 3, force: 1.2 },
+  shotgun: { name: 'M870 SHOTGUN', dmg: 17, rpm: 72, auto: false, mag: 6, reserve: 36, reload: 0.48, shell: true, spread: 0.05, pellets: 9, recoil: 1.5, kick: 0.05, range: 32, snd: 'shotgun', slot: 3, force: 1.2 },
   rifle: { name: 'M4 ASSAULT RIFLE', dmg: 40, rpm: 620, auto: true, mag: 30, reserve: 180, reload: 2.0, spread: 0.016, pellets: 1, recoil: 0.5, kick: 0.01, range: 120, snd: 'rifle', slot: 4 },
 };
 export const ORDER = ['pistol', 'smg', 'shotgun', 'rifle'];

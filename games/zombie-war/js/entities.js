@@ -78,6 +78,25 @@ function humanoid(o) {
   return R;
 }
 
+/* exact hit-scan: Raycaster vs the zombie's own visible meshes in their current animated pose; head meshes => 'head' */
+const _rc = new THREE.Raycaster(), _hits = [], _bc = new THREE.Vector3(), _bd = new THREE.Vector3();
+function tagParts(R) {
+  R.root.traverse(o => { o.userData.part = 'body'; });
+  R.head.traverse(o => { o.userData.part = 'head'; });
+  for (const l of R.legs) l.hp.traverse(o => { o.userData.part = 'leg'; });
+}
+function shown(o, root) { for (let q = o; q; q = q.parent) { if (!q.visible) return false; if (q === root) return true; } return false; }
+export function meshRay(e, o, d, maxT, cy, rad) {
+  const g = e.g, s = e.s || 1; if (!g.visible) return null;
+  // broad phase: bounding sphere around the body
+  _bc.set(g.position.x, g.position.y + cy * s, g.position.z); _bd.subVectors(_bc, o); const b = _bd.dot(d), R = rad * s;
+  if (b < -R || b - R > maxT || _bd.lengthSq() - b * b > R * R) return null;
+  if (!e.R._tagged) { tagParts(e.R); e.R._tagged = true; }
+  g.updateMatrixWorld(true); _rc.set(o, d); _rc.near = 0; _rc.far = maxT; _hits.length = 0; _rc.intersectObject(g, true, _hits);
+  for (const h of _hits) { if (!h.object.isMesh || !shown(h.object, g)) continue; return { t: h.distance, part: h.object.userData.part || 'body', point: h.point }; }
+  return null;
+}
+
 export const ZT = {
   walker: { hp: 100, speed: 1.05, dmg: 10, scale: 1.0, reach: 1.35, atk: 1.0, coin: 2, groan: 1 },
   runner: { hp: 65, speed: 3.6, dmg: 8, scale: 0.95, reach: 1.25, atk: 0.62, coin: 3, groan: 1.25 },
@@ -103,16 +122,10 @@ export class Zombie {
   get x() { return this.g.position.x; } get z() { return this.g.position.z; }
   alive() { return this.state !== 'dead'; }
   center(o = v1) { return this.R.chest.getWorldPosition(o); }
-  // ray hit test: returns {t, part}
-  rayHit(o, d, maxT, assist = 1) {
+  // ray hit test against the visible, animated meshes (exact silhouette): returns {t, part, point}
+  rayHit(o, d, maxT) {
     if (this.state === 'dead' || this.gone) return null;
-    const dx = this.g.position.x - o.x, dz = this.g.position.z - o.z; if (dx * dx + dz * dz > (maxT + 3) ** 2) return null;
-    let best = null; const s = this.s;
-    const test = (obj, r, part) => { obj.getWorldPosition(v2); v3.subVectors(v2, o); const b = v3.dot(d); if (b < 0) return; const c = v3.lengthSq() - b * b; const rr = r * r * assist * assist; if (c > rr) return; const t = b - Math.sqrt(rr - c); if (t < maxT && (!best || t < best.t)) best = { t, part }; };
-    if (!this.headless) test(this.R.headM, 0.16 * s, 'head');
-    test(this.R.chest, 0.29 * s * (this.type === 'exploder' ? 1.15 : 1), 'body'); test(this.R.hips, 0.22 * s, 'body');
-    test(this.R.legs[0].kn, 0.16 * s, 'leg'); test(this.R.legs[1].kn, 0.16 * s, 'leg');
-    return best;
+    return meshRay(this, o, d, maxT, 0.95, 1.25);
   }
   damage(amt, part, dir, ctx, o = {}) {
     if (this.state === 'dead') return null;
@@ -170,6 +183,10 @@ export class Zombie {
     g.position.x += (this.vel.x + this.kb.x) * dt; g.position.z += (this.vel.z + this.kb.z) * dt; this.kb.multiplyScalar(Math.max(0, 1 - dt * 6));
     v2.copy(g.position); ctx.world.collide(v2, 0.3 * s); g.position.x = v2.x; g.position.z = v2.z;
     const moved = Math.hypot(g.position.x - ox, g.position.z - oz);
+    // anti-stuck watchdog: a zombie that makes no progress for ~12 s (wedged on a prop/corner) is moved to a fresh walkable spot so waves can always be cleared
+    this.stT = (this.stT || 0) + dt; if (this.stT > 6) { const sx = this.stX ?? g.position.x, sz = this.stZ ?? g.position.z; const prog = Math.hypot(g.position.x - sx, g.position.z - sz);
+      this.stuckN = prog < 0.6 && sp > 0.1 && dist > 5 && this.state === 'move' ? (this.stuckN || 0) + 1 : 0; this.stT = 0; this.stX = g.position.x; this.stZ = g.position.z;
+      if (this.stuckN >= 2 && ctx.world.randomSpot) { const q = ctx.world.randomSpot(9, pl, 24); if (q) { g.position.x = q.x; g.position.z = q.z; this.stX = q.x; this.stZ = q.z; } this.stuckN = 0; } }
     // heading
     const want = dist < 3 ? Math.atan2(dx, dz) : (sp > 0.1 ? Math.atan2(dir.x, dir.z) : Math.atan2(dx, dz)); let dy = want - this.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; this.yaw += dy * Math.min(1, dt * (this.type === 'runner' ? 8 : 4)); g.rotation.y = this.yaw;
     // attack
@@ -248,11 +265,9 @@ export class Commander {
   get x() { return this.g.position.x; } get z() { return this.g.position.z; }
   alive() { return this.state !== 'dead'; }
   center(o = v1) { return this.R.chest.getWorldPosition(o); }
-  rayHit(o, d, maxT, assist = 1) {
-    if (this.state === 'dead' || this.state === 'intro') return null; let best = null; const s = this.s;
-    const test = (obj, r, part) => { obj.getWorldPosition(v2); v3.subVectors(v2, o); const b = v3.dot(d); if (b < 0) return; const c = v3.lengthSq() - b * b; const rr = r * r * assist; if (c > rr) return; const t = b - Math.sqrt(rr - c); if (t < maxT && (!best || t < best.t)) best = { t, part }; };
-    test(this.R.headM, 0.17 * s, 'head'); test(this.R.chest, 0.33 * s, 'body'); test(this.R.hips, 0.25 * s, 'body'); test(this.R.arms[1].el, 0.16 * s, 'body'); test(this.R.legs[0].kn, 0.17 * s, 'leg'); test(this.R.legs[1].kn, 0.17 * s, 'leg');
-    return best;
+  rayHit(o, d, maxT) {
+    if (this.state === 'dead' || this.state === 'intro') return null;
+    return meshRay(this, o, d, maxT, 1.0, 1.6);
   }
   damage(amt, part, dir, ctx, o = {}) {
     if (this.state === 'dead' || this.state === 'intro') return null; const d = amt * (part === 'head' ? 1.8 : part === 'leg' ? 0.8 : 1) * (this.act === 'stun' ? 1.6 : 1); this.hp -= d; this.flinch = Math.min(0.5, this.flinch + 0.05);
