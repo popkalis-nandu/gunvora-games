@@ -119,3 +119,30 @@ body.touch #hud .hud-tr .icon-btn{width:44px;height:44px}
   .logo .l3{letter-spacing:.45em;margin-top:8px}
   .btn{padding:8px 12px}
 }
+#cross.head i{background:#ffd23a}
+/* HUD above the touch layer so the pause button is tappable (the lookpad used to cover it) */
+#hud{z-index:12}
+/* phones held in portrait */
+@media (max-aspect-ratio:1/1){
+  .hud-tc{top:78px;width:92vw}
+  .obj{font-size:11px}
+  #compass{top:150px}
+  #boss-bar{top:150px;width:88vw}
+  #toast{white-space:normal;width:90vw;top:32%}
+  #t-sprint{left:max(70px,calc(env(safe-area-inset-left) + 70px));bottom:186px}
+}
+/* small landscape phones: keep the objective text clear of the health/lantern bars */
+@media (min-aspect-ratio:1/1) and (max-width:820px){.hud-tl{width:min(200px,28vw)}.obj{font-size:10px;max-width:calc(100vw - 2 * (min(200px,28vw) + 34px));margin-left:auto;margin-right:auto}}
+/* tiny embeds (game inside the site page on a phone held upright: ~410x230) */
+@media (max-height:300px){
+  #s-title{padding:6px 4vw 4px;column-gap:3vw}
+  #s-title .menu{min-width:150px}
+  .menu{gap:4px}
+  .btn{padding:4px 10px;font-size:11px;letter-spacing:.12em}
+  .btn small{display:none}
+  .logo .l1,.logo .l2{font-size:clamp(20px,6vw,40px)}
+  .logo .l3{font-size:9px;margin-top:4px}
+  .brand,.foot{font-size:9px!important}
+  .panel{max-height:96vh;overflow:auto;padding:8px 10px}
+  .panel h2{font-size:15px}
+}

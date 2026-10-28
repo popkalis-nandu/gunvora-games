@@ -55,13 +55,14 @@ export function generate(L) {
     for (const [px, pz] of [[7, 7], [W - 8, 7], [7, H - 8], [W - 8, H - 8], [7, cz | 0], [W - 8, cz | 0]]) { grid[id(px, pz)] = 2; out.pillars.push({ x: px + 0.5, z: pz + 0.5 }); }
     out.start = { x: cx, z: H - 3, yaw: 0 };
     out.bossPos = { x: cx, z: 5 };
-    const ex = Math.floor(W / 2) - 1; grid[id(ex, 0)] = 4; grid[id(ex + 1, 0)] = 4; out.exit = { tiles: [[ex, 0], [ex + 1, 0]], x: ex + 1, z: 0.5, side: 'N' };
+    const ex = Math.floor(W / 2) + 4; grid[id(ex, 0)] = 4; grid[id(ex + 1, 0)] = 4; out.exit = { tiles: [[ex, 0], [ex + 1, 0]], x: ex + 1, z: 0.5, side: 'N' };
     const n = P.urns; for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2 + 0.4; out.urns.push({ x: cx + Math.cos(a) * 9.5, z: cz + Math.sin(a) * 9.5 }); }
     // lights: big chandeliers + braziers
     for (const [x, z] of [[cx, cz], [cx, 6], [cx, H - 6]]) out.lights.push({ x, y: WALL_H - 0.9, z, c: 0xffa860, I: 7, D: 16, kind: 'chandelier' });
     for (const u of out.urns) out.lights.push({ x: u.x, y: 1.6, z: u.z, c: 0xff3020, I: 3, D: 7, kind: 'urn' });
     for (const p of out.pillars) out.furn.push({ kind: 'pillar', x: p.x, z: p.z, rot: 0 });
     out.furn.push({ kind: 'throne', x: cx, z: 2.2, rot: 0 });
+    for (let j = 1; j <= 3; j++) for (let i = Math.floor(cx) - 2; i <= Math.floor(cx) + 1; i++) grid[id(i, j)] = 2; // throne is solid
     out.furn.push({ kind: 'carpet', x: cx, z: cz, rot: 0, w: 3, d: H - 4 });
     for (let k = 0; k < 6; k++) { out.windows.push({ x: 4 + k * 4 + 1.5, z: H - 1, side: 'S' }); }
     for (let k = 0; k < 5; k++) { out.windows.push({ x: 1, z: 4 + k * 5, side: 'W' }); out.windows.push({ x: W - 1, z: 4 + k * 5, side: 'E' }); }

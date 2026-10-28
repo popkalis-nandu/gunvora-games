@@ -9,7 +9,7 @@ import { Zombie, Ghost, Boss, Particles } from './entities.js';
 import { Sfx } from './audio.js';
 
 const $ = id => document.getElementById(id);
-const IS_TOUCH = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches || (!matchMedia('(any-pointer: fine)').matches && navigator.maxTouchPoints > 0);
 if (IS_TOUCH) document.body.classList.add('touch');
 
 // ---------------- save ----------------
@@ -78,7 +78,10 @@ function applyQuality() {
 }
 function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); camera.aspect = w / h; camera.fov = w / h < 1.2 ? 85 : 72; camera.updateProjectionMatrix(); checkRotate(); }
 addEventListener('resize', resize);
-function checkRotate() { $('rotate').classList.toggle('hidden', !(IS_TOUCH && innerHeight > innerWidth && state === 'play')); }
+let rotateOK = false; // player chose to play in portrait
+function checkRotate() { $('rotate').classList.toggle('hidden', !(IS_TOUCH && !rotateOK && innerHeight > innerWidth && state === 'play')); }
+const rotateShown = () => !$('rotate').classList.contains('hidden');
+{ const r = $('rotate'); const go = e => { e.preventDefault(); rotateOK = true; checkRotate(); clock.getDelta(); }; r.addEventListener('touchend', go, { passive: false }); r.addEventListener('click', go); }
 
 const sfx = new Sfx(); sfx.setVolume(save.settings.vol);
 const particles = new Particles(scene);
@@ -98,6 +101,14 @@ const gun = new THREE.Group(); camera.add(gun);
 }
 const muzzle = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), new THREE.MeshBasicMaterial({ map: M.spark, color: new THREE.Color(3, 1.6, 0.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
 muzzle.position.set(0, 0, -0.47); gun.add(muzzle); muzzle.visible = false;
+// bullet tracer (muzzle -> exact hit point) and bullet-hole decals
+const tracer = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 1).translate(0, 0, 0.5), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.7, 0.9), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+tracer.visible = false; tracer.frustumCulled = false; scene.add(tracer); let tracerT = 0;
+const holeTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const g = x.createRadialGradient(32, 32, 2, 32, 32, 30); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.25, 'rgba(10,6,4,0.95)'); g.addColorStop(0.5, 'rgba(40,28,20,0.5)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+const holeMat = new THREE.MeshBasicMaterial({ map: holeTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+const holes = new THREE.Group(); scene.add(holes); const holeGeo = new THREE.PlaneGeometry(0.09, 0.09); let holeIdx = 0;
+for (let k = 0; k < 40; k++) { const h = new THREE.Mesh(holeGeo, holeMat); h.visible = false; holes.add(h); }
+function addHole(p, n) { const h = holes.children[holeIdx++ % holes.children.length]; h.position.copy(p).addScaledVector(n, 0.004); h.lookAt(p.x + n.x, p.y + n.y, p.z + n.z); h.rotateZ(Math.random() * 6.28); h.scale.setScalar(0.8 + Math.random() * 0.5); h.visible = true; }
 const GUN_REST = new THREE.Vector3(0.2, -0.2, -0.38); gun.position.copy(GUN_REST); gun.visible = false;
 // lantern wave mesh
 const wave = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.4, 2.4), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide, toneMapped: false }));
@@ -119,7 +130,7 @@ let ammo = 6, reloadT = 0, fireT = 0, lanternT = 0, flashOn = true, shakeA = 0, 
 let timeLeft = 0, timeLimit = 1, cluesGot = 0, exitOpen = false, coinsRun = 0, killsRun = 0, secretRun = false, elapsed = 0, scareT = 20, blackoutT = 0, scareFaceT = 0, heartT = 0, stepT = 0, flowTile = -1, poolT = 0, ended = false, winT = -1;
 let flow = null;
 const keys = {};
-const input = { mx: 0, mz: 0, fire: false, sprint: false, lookDX: 0, lookDY: 0 };
+const input = { mx: 0, mz: 0, fire: false, sprint: false, lookDX: 0, lookDY: 0, fireQ: 0, qAim: null, curX: 0, curY: 0, hasCur: false };
 
 const LORE = ['"The master signed his soul to the house in 1847."', '"Every night the walls move. The house is hungry."', '"Do not trust the bookshelves. Some of them breathe."', '"His heart is kept in the urns. Break them."', '"The servants never left. They only stopped dying."', '"Sunrise is the only key the house fears."', '"I heard the piano play itself again tonight."', '"Light draws the spirits. Darkness hides you."', '"The children\'s room... never go to the nursery."', '"He cannot die while the soul fires burn."', '"Count the doors. Tomorrow there will be more."', '"The portraits\' eyes follow the guilty."', '"Holy silver stops the dead. Not the departed."', '"The Grand Hall appears every tenth night."', '"We buried him three times. He came to dinner."', '"Some guests escaped. Most became furniture."'];
 
@@ -132,6 +143,7 @@ function collide(x, z, r) {
       if (!solidAt(i, j)) continue; const cx = Math.max(i, Math.min(x, i + 1)), cz = Math.max(j, Math.min(z, j + 1)); let dx = x - cx, dz = z - cz; const d = Math.hypot(dx, dz);
       if (d < r) { if (d < 1e-5) { dx = x - (i + 0.5); dz = z - (j + 0.5); const dd = Math.hypot(dx, dz) || 1; x = i + 0.5 + dx / dd * (0.71 + r); z = j + 0.5 + dz / dd * (0.71 + r); } else { x = cx + dx / d * r; z = cz + dz / d * r; } }
     }
+    for (const u of urns) { if (!u.g.visible) continue; const dx = x - u.x, dz = z - u.z, d = Math.hypot(dx, dz), m = 0.5 + r; if (d < m) { const k = d > 1e-5 ? m / d : 0; x = d > 1e-5 ? u.x + dx * k : u.x + m; z = d > 1e-5 ? u.z + dz * k : z; } }
   }
   return [x, z];
 }
@@ -158,7 +170,7 @@ const game = {
   shake(a) { shakeA = Math.max(shakeA, a); },
   spawnOrb(x, y, z, yaw) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 0.4, 0.15), toneMapped: false })); m.position.set(x, y, z); dyn.add(m);
     const dx = player.x - x, dz = player.z - z, dy = 1.4 - y, d = Math.hypot(dx, dz) || 1; const dir = new THREE.Vector3(Math.sin(yaw), dy / d, Math.cos(yaw)).normalize(); orbs.push({ m, v: dir.multiplyScalar(7 + P.d * 4), life: 6 }); sfx.orb(); },
-  bossSummon(b) { for (let k = 0; k < 2; k++) { const a = Math.random() * 6.28; const p = collide(b.x + Math.cos(a) * 2.5, b.z + Math.sin(a) * 2.5, 0.4); const z = new Zombie(dyn, p[0], p[1], P, Math.random, k); z.aggro = true; zombies.push(z); particles.emit(p[0], 0.3, p[1], { n: 30, color: [1.5, 0.2, 0.1], up: 3, grav: -2, size: 0.25 }); } toast('The dead rise to serve their Master!'); },
+  bossSummon(b) { for (let k = 0; k < 2; k++) { let p = null; for (let tr = 0; tr < 12; tr++) { const a = Math.random() * 6.28; const q = collide(b.x + Math.cos(a) * 2.5, b.z + Math.sin(a) * 2.5, 0.4); if (Math.hypot(q[0] - player.x, q[1] - player.z) > 2.2) { p = q; break; } } if (!p) continue; const z = new Zombie(dyn, p[0], p[1], P, Math.random, k); z.aggro = true; zombies.push(z); particles.emit(p[0], 0.3, p[1], { n: 30, color: [1.5, 0.2, 0.1], up: 3, grav: -2, size: 0.25 }); } toast('The dead rise to serve their Master!'); },
   bossTeleport(b) { particles.emit(b.x, 2, b.z, { n: 60, color: [2, 0.2, 0.1], speed: 4, up: 1, grav: 0, size: 0.3, life: 1 }); const a = Math.random() * 6.28; const p = collide(Math.max(3, Math.min(G.W - 3, player.x + Math.cos(a) * 7)), Math.max(3, Math.min(G.H - 3, player.z + Math.sin(a) * 7)), 0.9); b.root.position.x = p[0]; b.root.position.z = p[1]; particles.emit(p[0], 2, p[1], { n: 60, color: [2, 0.2, 0.1], speed: 4, up: 1, grav: 0, size: 0.3, life: 1 }); sfx.whisper(); shakeA = Math.max(shakeA, 0.3); },
 };
 
@@ -188,7 +200,7 @@ function loadLevel(n, forMenu = false) {
   levelGroup = buildLevel(G); scene.add(levelGroup); dyn = new THREE.Group(); scene.add(dyn);
   const SG = sharedGeo();
   // base floor under thresholds
-  const base = new THREE.Mesh(new THREE.PlaneGeometry(G.W + 2, G.H + 2), M.floorDark); base.rotation.x = -Math.PI / 2; base.position.set(G.W / 2, -0.01, G.H / 2); base.receiveShadow = true; dyn.add(base);
+  const base = new THREE.Mesh(new THREE.PlaneGeometry(G.W + 2, G.H + 2), M.floorDark); base.name = 'base'; base.rotation.x = -Math.PI / 2; base.position.set(G.W / 2, -0.01, G.H / 2); base.receiveShadow = true; dyn.add(base);
   // exit door
   { const e = G.exit; const g = new THREE.Group(); g.position.set(e.x, 0, e.z); g.rotation.y = ROT[e.side]; dyn.add(g);
     const wm = new THREE.MeshStandardMaterial({ color: 0x3a1a0a, roughness: 0.6, map: M.wood.map }); const gold = new THREE.MeshStandardMaterial({ color: 0xc8a050, metalness: 1, roughness: 0.3 });
@@ -216,7 +228,11 @@ function loadLevel(n, forMenu = false) {
   for (const u of G.urns) { const g = new THREE.Group(); g.position.set(u.x, 0, u.z); const st = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.0, 10), M.stone); st.position.y = 0.5; st.material = new THREE.MeshStandardMaterial({ color: 0x5a5450, map: M.stone.map }); g.add(st);
     const urnM = new THREE.MeshStandardMaterial({ color: 0x3a3a40, metalness: 0.8, roughness: 0.3, emissive: 0x000000 }); const urn = new THREE.Mesh(new THREE.LatheGeometry([0.05, 0.2, 0.28, 0.25, 0.14, 0.18].map((r, i) => new THREE.Vector2(r, i * 0.12)), 14), urnM); urn.position.y = 1.0; g.add(urn);
     const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.spark, color: new THREE.Color(1.6, 0.35, 0.1), toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); fl.position.y = 1.7; fl.scale.set(0.32, 0.55, 1); g.add(fl); const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: M.spark, color: new THREE.Color(0.6, 2.2, 1.6), toneMapped: false, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); core.scale.set(0.22, 0.32, 1); fl.add(core); core.position.y = -0.1;
-    dyn.add(g); urns.push({ g, fl, urnM, x: u.x, z: u.z, hp: 100, alive: true }); }
+    dyn.add(g); urns.push({ g, fl, urnM, x: u.x, z: u.z, hp: 100, alive: true, hitList: [st, urn, fl] }); }
+  solidMeshes = []; levelGroup.traverse(o => { if (o.isMesh && !['glow', 'flame', 'web'].includes(o.name) && !(o.material && o.material.transparent)) solidMeshes.push(o); });
+  if (exitDoor) exitDoor.g.traverse(o => { if (o.isMesh && !o.material.transparent) solidMeshes.push(o); });
+  for (const sd of secretDoors) sd.shelf.traverse(o => { if (o.isMesh) solidMeshes.push(o); });
+  solidMeshes.push(base); ghostHint = false; for (const h of holes.children) h.visible = false; tracer.visible = false;
   if (forMenu) { exitOpen = false; return; }
   // enemies
   const rng = mulberry(n * 3331 + 7);
@@ -257,29 +273,52 @@ function hud() {
 // ---------------- combat ----------------
 const ray = new THREE.Vector3(), org = new THREE.Vector3();
 function wallHit(o, d, maxT = 40) { for (let t = 0.1; t < maxT; t += 0.06) { const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t; if (y < 0 || y > WALL_H) return t; const i = Math.floor(x), j = Math.floor(z); if (i < 0 || j < 0 || i >= G.W || j >= G.H) return t; const v = G.grid[j * G.W + i]; if (v === 1 || v === 3 || v === 4) return t; if (v === 2 && y < 0.95) return t; } return maxT; }
-function raySphere(o, d, s) { const ox = o.x - s.x, oy = o.y - s.y, oz = o.z - s.z; const b = ox * d.x + oy * d.y + oz * d.z, c = ox * ox + oy * oy + oz * oz - s.r * s.r; const h = b * b - c; if (h < 0) return -1; const t = -b - Math.sqrt(h); return t > 0 ? t : -1; }
-function fire() {
-  if (reloadT > 0 || fireT > 0) return; if (ammo <= 0) { sfx.click(); startReload(); return; }
-  ammo--; fireT = ST.fireInt; sfx.shot(); shakeA = Math.max(shakeA, 0.12); gunKick = 1; muzzle.visible = true; muzzle.rotation.z = Math.random() * 6; muzzleT = 0.06; muzzleLight.intensity = 30;
-  camera.getWorldPosition(org); camera.getWorldDirection(ray); const spread = 0.012; ray.x += (Math.random() - .5) * spread; ray.y += (Math.random() - .5) * spread; ray.normalize();
-  const wt = wallHit(org, ray); let best = wt, hit = null, head = false;
-  for (const z of zombies) { if (z.state === 'dead') continue; for (const s of z.spheres()) { const t = raySphere(org, ray, s); if (t > 0 && t < best) { best = t; hit = z; head = !!s.head; } } }
-  if (boss && boss.state !== 'dead') { for (const s of boss.spheres()) { const t = raySphere(org, ray, boss.shielded ? { x: boss.x, y: 2.2, z: boss.z, r: 1.95 } : s); if (t > 0 && t < best) { best = t; hit = boss; head = !!s.head && !boss.shielded; } } }
-  for (const u of urns) { if (!u.alive) continue; const t = raySphere(org, ray, { x: u.x, y: 1.25, z: u.z, r: 0.38 }); if (t > 0 && t < best) { best = t; hit = u; } }
-  const hp = org.clone().addScaledVector(ray, best);
-  if (hit && hit instanceof Zombie) { const killed = hit.hit(ST.dmg, head); particles.emit(hp.x, hp.y, hp.z, { n: head ? 26 : 14, color: [0.5, 0.02, 0.01], speed: 3, up: 1, size: 0.09, life: 0.7, grav: -9 }); sfx.zombieHit(); crossHit();
-    if (killed) { sfx.zombieDie(); killsRun++; coinsRun += 3; particles.emit(hit.x, 1, hit.z, { n: 30, color: [0.4, 0.02, 0.01], speed: 2.5, up: 2, size: 0.12, grav: -9 }); } }
-  else if (hit && hit === boss) { const r = boss.hit(ST.dmg, head); crossHit(); if (r === 'shield') { particles.emit(hp.x, hp.y, hp.z, { n: 18, color: [2, 0.4, 0.1], speed: 4, size: 0.1, life: 0.4 }); sfx.noise(0.2, { type: 'highpass', f: 2500, g: 0.4 }); } else { particles.emit(hp.x, hp.y, hp.z, { n: 20, color: [0.3, 0.0, 0.05], speed: 3, size: 0.12, grav: -6 }); sfx.zombieHit();
-    if (!boss.phase2 && boss.hp < boss.maxHp * 0.5) { boss.phase2 = true; sfx.bossRoar(); shakeA = 0.6; if (boss.final) { for (const u of urns) { u.alive = true; u.hp = 140; u.g.visible = true; u.fl.visible = true; u.g.scale.setScalar(1); } boss.urnsAlive = urns.length; toast('"I AM ETERNAL!" — the urns reignite!', 3); } else toast('The Master is enraged!'); updateObjective(); }
-    if (r === 'kill') bossDefeated(); } }
-  else if (hit && hit.urnM) { hit.hp -= ST.dmg; crossHit(); hit.urnM.emissive.setRGB(1, 0.2, 0); setTimeout(() => hit.urnM.emissive.setRGB(0, 0, 0), 80); particles.emit(hp.x, hp.y, hp.z, { n: 12, color: [2, 0.5, 0.1], speed: 3, size: 0.1 });
-    if (hit.hp <= 0) { hit.alive = false; hit.fl.visible = false; hit.g.scale.setScalar(0.001); hit.g.visible = false; particles.emit(hit.x, 1.3, hit.z, { n: 70, color: [2.5, 0.4, 0.1], speed: 5, up: 2, size: 0.2, life: 1.2 }); sfx.boom(); shakeA = 0.4; boss.urnsAlive = urns.filter(u => u.alive).length; coinsRun += 10;
-      toast(boss.urnsAlive ? `Soul urn shattered! ${boss.urnsAlive} remain` : 'His immortality is broken!'); updateObjective(); } }
-  else particles.emit(hp.x - ray.x * 0.05, hp.y - ray.y * 0.05, hp.z - ray.z * 0.05, { n: 8, color: [1.2, 0.8, 0.4], speed: 2, size: 0.05, life: 0.4, grav: -8 });
-  if (ammo === 0) setTimeout(() => { if (ammo === 0 && state === 'play') startReload(); }, 250);
+function raySphere(o, d, s) { const ox = o.x - s.x, oy = o.y - s.y, oz = o.z - s.z; const b = ox * d.x + oy * d.y + oz * d.z, c = ox * ox + oy * oy + oz * oz - s.r * s.r; const h = b * b - c; if (h < 0) return -1; const sq = Math.sqrt(h), t = -b - sq; return t > 0 ? t : (-b + sq > 0 ? 0 : -1); }
+// Hit-scan: ray from the camera through the crosshair (screen centre) or, without pointer lock, through the mouse cursor.
+// Tests the actual rendered (animated) meshes of enemies, urns, walls, furniture and doors, using the world matrices of the frame the player saw.
+const rc = new THREE.Raycaster(); rc.camera = camera; const ndcV = new THREE.Vector2(); let solidMeshes = []; let ghostHint = false;
+const shown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+function castShot(nx, ny) {
+  ndcV.set(nx, ny); rc.setFromCamera(ndcV, camera); rc.near = 0.05; rc.far = 70; const o = rc.ray.origin, d = rc.ray.direction;
+  const r = { t: 70, point: null, normal: null, ent: null, kind: 'none', head: false };
+  for (const h of rc.intersectObjects(solidMeshes, false)) { if (!shown(h.object)) continue; r.t = h.distance; r.point = h.point; r.normal = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new THREE.Vector3(-d.x, -d.y, -d.z); if (r.normal.dot(d) > 0) r.normal.negate(); r.kind = 'world'; break; }
+  const test = (list, ent, kind) => { for (const h of rc.intersectObjects(list, false)) { if (h.distance >= r.t) return; if (!shown(h.object)) continue; r.t = h.distance; r.point = h.point; r.normal = null; r.ent = ent; r.kind = kind; r.head = !!h.object.userData.head; return; } };
+  for (const z of zombies) { if (z.state === 'dead') continue; if (raySphere(o, d, { x: z.x, y: 1.0 * z.scale, z: z.z, r: 1.5 * z.scale }) < 0) continue; test(z.hitMeshes, z, 'zombie'); }
+  // urns first: the boss's shield never blocks shots at his own soul urns (he may stand right next to one)
+  for (const u of urns) { if (!u.alive) continue; test(u.hitList, u, 'urn'); }
+  if (boss && boss.state !== 'dead' && raySphere(o, d, { x: boss.x, y: 2.3, z: boss.z, r: 3.6 }) >= 0) { if (boss.shielded) { if (r.kind !== 'urn') test([boss.shield], boss, 'shield'); } else test(boss.hitMeshes, boss, 'boss'); }
+  if (!r.point) r.point = o.clone().addScaledVector(d, r.t);
+  // bullets pass through spirits: tell the player once per night
+  if (!ghostHint) for (const g of ghosts) if (g.state !== 'banished' && raySphere(o, d, { x: g.x, y: 1.4, z: g.z, r: 0.6 }) > 0 && raySphere(o, d, { x: g.x, y: 1.4, z: g.z, r: 0.6 }) < r.t) { ghostHint = true; toast('Bullets pass through spirits — use the Spirit Lantern (' + (IS_TOUCH ? '🏮' : 'Q / right-click') + ')!', 3); break; }
+  return r;
 }
+const tmpV = new THREE.Vector3();
+function fire(aim) {
+  if (reloadT > 0 || fireT > 0) return false; if (ammo <= 0) { sfx.click(); startReload(); return false; }
+  ammo--; fireT = ST.fireInt; sfx.shot(); shakeA = Math.max(shakeA, 0.12); gunKick = 1; muzzle.visible = true; muzzle.rotation.z = Math.random() * 6; muzzleT = 0.06; muzzleLight.intensity = 30;
+  const a = aim || currentAim(); const r = castShot(a[0], a[1]); const hp = r.point; window.__nh.shotN++; window.__nh.lastShot = { kind: r.kind, head: r.head, x: hp.x, y: hp.y, z: hp.z, t: r.t, ndc: a };
+  // tracer from the muzzle to the exact impact point
+  muzzle.getWorldPosition(tmpV); const len = tmpV.distanceTo(hp); if (len > 0.3) { tracer.position.copy(tmpV); tracer.lookAt(hp); tracer.scale.set(1, 1, len); tracer.visible = true; tracerT = 0.05; }
+  if (r.kind === 'zombie') { const z = r.ent; const killed = z.hit(ST.dmg, r.head); particles.emit(hp.x, hp.y, hp.z, { n: r.head ? 26 : 14, color: [0.5, 0.02, 0.01], speed: 3, up: 1, size: 0.09, life: 0.7, grav: -9 }); sfx.zombieHit(); crossHit(r.head);
+    if (killed) { sfx.zombieDie(); killsRun++; coinsRun += r.head ? 5 : 3; if (r.head) toast('HEADSHOT', 0.8); particles.emit(z.x, 1, z.z, { n: 30, color: [0.4, 0.02, 0.01], speed: 2.5, up: 2, size: 0.12, grav: -9 }); } }
+  else if (r.kind === 'shield' || r.kind === 'boss') { const res = boss.hit(ST.dmg, r.head); crossHit(r.head && res === 'hit');
+    if (res === 'shield' || res === 'none') { particles.emit(hp.x, hp.y, hp.z, { n: 18, color: [2, 0.4, 0.1], speed: 4, size: 0.1, life: 0.4 }); sfx.noise(0.2, { type: 'highpass', f: 2500, g: 0.4 }); if (res === 'shield' && !boss.shieldHint) { boss.shieldHint = true; toast('His shield holds! Shoot the burning soul urns first', 2.4); } }
+    else { particles.emit(hp.x, hp.y, hp.z, { n: 20, color: [0.3, 0.0, 0.05], speed: 3, size: 0.12, grav: -6 }); sfx.zombieHit();
+      if (!boss.phase2 && boss.hp < boss.maxHp * 0.5) { boss.phase2 = true; sfx.bossRoar(); shakeA = 0.6; if (boss.final) { for (const u of urns) { u.alive = true; u.hp = 140; u.g.visible = true; u.fl.visible = true; u.g.scale.setScalar(1); } boss.urnsAlive = urns.length; toast('"I AM ETERNAL!" — the urns reignite!', 3); } else toast('The Master is enraged!'); updateObjective(); }
+      if (res === 'kill') bossDefeated(); } }
+  else if (r.kind === 'urn') { const u = r.ent; u.hp -= ST.dmg; crossHit(); u.urnM.emissive.setRGB(1, 0.2, 0); setTimeout(() => u.urnM.emissive.setRGB(0, 0, 0), 80); particles.emit(hp.x, hp.y, hp.z, { n: 12, color: [2, 0.5, 0.1], speed: 3, size: 0.1 });
+    if (u.hp <= 0) { u.alive = false; u.fl.visible = false; u.g.visible = false; particles.emit(u.x, 1.3, u.z, { n: 70, color: [2.5, 0.4, 0.1], speed: 5, up: 2, size: 0.2, life: 1.2 }); sfx.boom(); shakeA = 0.4; if (boss) boss.urnsAlive = urns.filter(x => x.alive).length; coinsRun += 10;
+      toast(boss && boss.urnsAlive ? `Soul urn shattered! ${boss.urnsAlive} remain` : 'His immortality is broken!'); updateObjective(); } }
+  else if (r.kind === 'world') { addHole(hp, r.normal); particles.emit(hp.x + r.normal.x * 0.03, hp.y + r.normal.y * 0.03, hp.z + r.normal.z * 0.03, { n: 8, color: [1.2, 0.8, 0.4], speed: 2, size: 0.05, life: 0.4, grav: -8 }); }
+  if (ammo === 0) setTimeout(() => { if (ammo === 0 && state === 'play') startReload(); }, 250);
+  return true;
+}
+// where the shot goes: screen centre (pointer lock / touch) or the mouse cursor when the mouse is free
+function currentAim() { if (IS_TOUCH || document.pointerLockElement || !input.hasCur) return [0, 0]; return [input.curX, input.curY]; }
+function setCursor(e) { const r = canvas.getBoundingClientRect(); input.curX = ((e.clientX - r.left) / r.width) * 2 - 1; input.curY = -(((e.clientY - r.top) / r.height) * 2 - 1); input.hasCur = true; placeCross(); }
+function placeCross() { const c = $('cross'); const a = currentAim(); if (a[0] === 0 && a[1] === 0) { c.style.left = ''; c.style.top = ''; } else { c.style.left = ((a[0] + 1) / 2 * 100) + '%'; c.style.top = ((1 - a[1]) / 2 * 100) + '%'; } }
 let gunKick = 0, muzzleT = 0, reloadAnim = 0;
-function crossHit() { const c = $('cross'); c.classList.add('hit'); setTimeout(() => c.classList.remove('hit'), 120); }
+function crossHit(head) { const c = $('cross'); c.classList.add('hit'); c.classList.toggle('head', !!head); setTimeout(() => c.classList.remove('hit', 'head'), 140); }
 function startReload() { if (reloadT > 0 || ammo === ST.cap) return; reloadT = ST.reload; sfx.reload(); }
 function useLantern() {
   if (lanternT > 0) return; lanternT = ST.lanternCd; sfx.lantern(); blueFx = 1; wave.visible = true; wave.userData.t = 0; wave.position.set(player.x, 1.4, player.z); lanternLight.intensity = 40;
@@ -295,7 +334,7 @@ function jumpScare(big) { scareFace.visible = true; scareFaceT = big ? 0.5 : 0.3
 function bossDefeated() {
   sfx.boom(); sfx.bossRoar(); shakeA = 1; flashFx = 1; particles.emit(boss.x, 2.5, boss.z, { n: 200, color: [2.5, 0.5, 0.1], speed: 7, up: 2, grav: -1, size: 0.3, life: 1.6 }); coinsRun += 40 + L;
   for (const z of zombies) if (z.state !== 'dead') { z.hit(99999); } for (const g of ghosts) g.banish();
-  toast(P.final ? 'The Immortal Master is finally DEAD!' : 'The Master falls… for tonight.', 3.5); setTimeout(() => { if (state === 'play') unlockExit(); }, 1800); updateObjective();
+  toast(P.final ? 'The Immortal Master is finally DEAD!' : 'The Master falls… for tonight.', 3.5); const g0 = G; setTimeout(() => { if (G === g0 && !ended) unlockExit(); }, 1800); updateObjective();
 }
 
 // ---------------- scares ----------------
@@ -363,10 +402,17 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 let dragLook = false;
-canvas.addEventListener('mousedown', e => { if (state !== 'play' || IS_TOUCH) return; if (!document.pointerLockElement) { lockPointer(); dragLook = true; } if (e.button === 0) input.fire = true; if (e.button === 2) useLantern(); });
+let lastTouchT = -1e9; addEventListener('touchstart', () => { lastTouchT = performance.now(); }, { capture: true, passive: true });
+const fromTouch = e => (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) || performance.now() - lastTouchT < 900;
+canvas.addEventListener('mousedown', e => { if (state !== 'play' || fromTouch(e)) return; e.preventDefault(); setCursor(e);
+  if (e.button === 0) { input.fire = true; input.fireQ = performance.now(); input.qBuf = 0.45; input.qAim = currentAim(); }
+  if (e.button === 2) useLantern();
+  if (!document.pointerLockElement) { lockPointer(); dragLook = true; } });
 addEventListener('mouseup', e => { if (e.button === 0) input.fire = false; dragLook = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
-addEventListener('mousemove', e => { if (state !== 'play' || IS_TOUCH) return; if (document.pointerLockElement || dragLook) { input.lookDX += e.movementX; input.lookDY += e.movementY; } });
+addEventListener('mousemove', e => { if (state !== 'play' || fromTouch(e)) return; if (document.pointerLockElement || dragLook) { input.lookDX += e.movementX; input.lookDY += e.movementY; } if (!document.pointerLockElement) setCursor(e); });
+document.addEventListener('pointerlockchange', () => placeCross());
+addEventListener('blur', () => { input.fire = false; dragLook = false; for (const k in keys) keys[k] = false; });
 $('s-intro').addEventListener('click', () => { if (state === 'intro') beginPlay(); });
 
 // ---------------- input: touch ----------------
@@ -377,8 +423,8 @@ $('lookpad').addEventListener('touchstart', e => { e.preventDefault(); const t =
 addEventListener('touchmove', e => { for (const t of e.changedTouches) { if (t.identifier === joy.id) moveJoy(t); else if (t.identifier === look.id) { input.lookDX += (t.clientX - look.x) * 1.6; input.lookDY += (t.clientY - look.y) * 1.6; look.x = t.clientX; look.y = t.clientY; } } }, { passive: false });
 const endTouch = e => { for (const t of e.changedTouches) { if (t.identifier === joy.id) { joy.id = null; input.mx = input.mz = 0; input.sprint = input.sprintToggle; $('joy-k').style.transform = ''; } if (t.identifier === look.id) look.id = null; } };
 addEventListener('touchend', endTouch); addEventListener('touchcancel', endTouch);
-const tbtn = (id, down, up) => { const el = $(id); el.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); el.classList.add('on'); down(); }, { passive: false }); el.addEventListener('touchend', e => { e.preventDefault(); el.classList.remove('on'); up && up(); }, { passive: false }); };
-tbtn('t-fire', () => input.fire = true, () => input.fire = false); tbtn('t-reload', startReload); tbtn('t-lantern', useLantern); tbtn('t-use', () => interact());
+const tbtn = (id, down, up) => { const el = $(id); el.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); el.classList.add('on'); down(); }, { passive: false }); const end = e => { e.preventDefault(); el.classList.remove('on'); up && up(); }; el.addEventListener('touchend', end, { passive: false }); el.addEventListener('touchcancel', end, { passive: false }); };
+tbtn('t-fire', () => { input.fire = true; input.fireQ = performance.now(); input.qBuf = 0.45; input.qAim = [0, 0]; }, () => input.fire = false); tbtn('t-reload', startReload); tbtn('t-lantern', useLantern); tbtn('t-use', () => interact());
 tbtn('t-sprint', () => { input.sprintToggle = !input.sprintToggle; input.sprint = input.sprintToggle; $('t-sprint').style.background = input.sprintToggle ? '#ff3a2a88' : ''; });
 tbtn('t-light', () => { flashOn = !flashOn; sfx.click(); });
 function tryFullscreen() { if (!IS_TOUCH) return; try { const el = document.documentElement; if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().then(() => { try { screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } }).catch(() => { }); } catch (e) { } }
@@ -402,6 +448,9 @@ function update(dt) {
   if (state !== 'play') { if (state === 'won' || state === 'over') { updateLights(dt, player.x, player.z); } return; }
   elapsed += dt; timeLeft -= dt;
   if (timeLeft <= 0) { timeLeft = 0; gameOver('SUNRISE', 'The sun rose before you escaped. The house keeps its guests forever.'); return; }
+  // weapon first: the shot uses exactly the camera + enemy poses that were on screen when the player clicked
+  fireT -= dt; if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) { ammo = ST.cap; reloadT = 0; } }
+  if (input.fireQ || input.fire) { if (fire(input.fireQ ? input.qAim : null) || ammo <= 0) { input.fireQ = 0; input.qAim = null; } else if (input.fireQ) { input.qBuf -= dt; if (input.qBuf <= 0) { input.fireQ = 0; input.qAim = null; } } }
   // look
   const sens = 0.0022 * save.settings.sens; player.yaw -= input.lookDX * sens; player.pitch = Math.max(-1.3, Math.min(1.3, player.pitch - input.lookDY * sens)); input.lookDX = input.lookDY = 0;
   // move
@@ -418,8 +467,7 @@ function update(dt) {
   camera.position.set(player.x + bobX * cy + (Math.random() - .5) * sh * 0.3, 1.6 + bobY + (Math.random() - .5) * sh * 0.3, player.z - bobX * sy);
   camera.rotation.set(player.pitch + (Math.random() - .5) * sh * 0.08, player.yaw + (Math.random() - .5) * sh * 0.08, (Math.random() - .5) * sh * 0.05);
   // weapon
-  fireT -= dt; if (reloadT > 0) { reloadT -= dt; if (reloadT <= 0) { ammo = ST.cap; reloadT = 0; } }
-  if (input.fire) fire();
+  tracerT -= dt; if (tracerT <= 0) tracer.visible = false;
   gunKick = Math.max(0, gunKick - dt * 7); muzzleT -= dt; if (muzzleT <= 0) { muzzle.visible = false; muzzleLight.intensity = 0; }
   reloadAnim += ((reloadT > 0 ? 1 : 0) - reloadAnim) * Math.min(1, dt * 10);
   gun.position.set(GUN_REST.x + Math.cos(player.bob) * 0.012, GUN_REST.y + Math.abs(Math.sin(player.bob)) * 0.012 - reloadAnim * 0.15, GUN_REST.z + gunKick * 0.07); gun.rotation.set(gunKick * 0.35 + reloadAnim * 0.6, 0, reloadAnim * 0.9);
@@ -439,7 +487,7 @@ function update(dt) {
     if (hitP || wall || o.life <= 0) { particles.emit(o.m.position.x, o.m.position.y, o.m.position.z, { n: 25, color: [2, 0.3, 0.1], speed: 3, size: 0.18, grav: 0, life: 0.5 }); if (hitP) hurt(14 + P.d * 14); dyn.remove(o.m); o.m.geometry.dispose(); orbs.splice(i, 1); } }
   // pickups
   for (const c of clueObjs) { if (c.got) continue; c.g.rotation.y += dt * 1.5; c.g.position.y = 1.0 + Math.sin(T * 2 + c.ph) * 0.1; if (Math.random() < dt * 6) particles.emit(c.x, 1.0, c.z, { n: 1, color: [0.6, 1.2, 1.6], speed: 0.4, up: 0.5, grav: 0.2, size: 0.08, life: 1.2 });
-    if (Math.hypot(c.x - player.x, c.z - player.z) < 1.0) { c.got = true; c.g.visible = false; cluesGot++; sfx.pickup(); coinsRun += 5; particles.emit(c.x, 1, c.z, { n: 40, color: [0.6, 1.4, 2], speed: 3, up: 1, grav: 0, size: 0.12 }); toast(LORE[(L * 3 + cluesGot) % LORE.length], 3.2); if (cluesGot >= G.clues.length) setTimeout(() => unlockExit(), 900); updateObjective(); } }
+    if (Math.hypot(c.x - player.x, c.z - player.z) < 1.0) { c.got = true; c.g.visible = false; cluesGot++; sfx.pickup(); coinsRun += 5; particles.emit(c.x, 1, c.z, { n: 40, color: [0.6, 1.4, 2], speed: 3, up: 1, grav: 0, size: 0.12 }); toast(LORE[(L * 3 + cluesGot) % LORE.length], 3.2); if (cluesGot >= G.clues.length) { const g0 = G; setTimeout(() => { if (G === g0 && !ended) unlockExit(); }, 900); } updateObjective(); } }
   for (const p of pickups) { if (p.got) continue; p.m.rotation.y += dt * 2.5; if (Math.hypot(p.x - player.x, p.z - player.z) < 0.8) { if (p.type === 'med' && player.hp >= player.maxHp) continue; p.got = true; p.m.visible = false; if (p.type === 'coin') { coinsRun += p.v; sfx.coin(); } else { player.hp = Math.min(player.maxHp, player.hp + 35); sfx.pickup(); toast('+35 health', 1.2); } } }
   if (chest && !chest.got && Math.hypot(chest.x - player.x, chest.z - player.z) < 1.3) { chest.got = true; const v = 30 + L; coinsRun += v; sfx.victory(); toast(`Treasure! +${v} coins`); particles.emit(chest.x, 0.8, chest.z, { n: 60, color: [2, 1.5, 0.4], speed: 3, up: 3, size: 0.12 }); chest.g.children[1].rotation.x = -1.2; }
   // secret doors
@@ -480,6 +528,7 @@ function updateDust() { dust.position.set(Math.floor(camera.position.x / 16) * 1
 
 function loop() {
   requestAnimationFrame(loop); const dt = Math.min(0.05, clock.getDelta());
+  if (state === 'play' && rotateShown()) { composer.render(0); return; } // frozen while asking to rotate: enemies can't hurt you behind the overlay
   try { update(dt); } catch (e) { console.error(e); }
   composer.render(dt);
   if (save.settings.fps) { fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { $('fps').textContent = Math.round(fpsN / fpsAcc) + ' fps'; fpsAcc = 0; fpsN = 0; } }
@@ -527,4 +576,4 @@ applyQuality(); $('fps').classList.toggle('hidden', !save.settings.fps);
 goMenu(); $('loading').classList.add('hidden'); loop();
 
 // test / automation hooks
-window.__nh = { startLevel, beginPlay, get state() { return state; }, get player() { return player; }, get G() { return G; }, get zombies() { return zombies; }, get ghosts() { return ghosts; }, get boss() { return boss; }, get urns() { return urns; }, save: () => save, unlockExit, levelComplete, jumpScare, fire, useLantern, input, renderer, scene, camera, setQuality: q => { save.settings.q = q; applyQuality(); }, levelParams, generate, collectAll: () => { for (const c of clueObjs) { c.got = true; c.g.visible = false; } cluesGot = clueObjs.length; unlockExit(); } };
+window.__nh = { audioState: () => sfx.ctx ? sfx.ctx.state : 'none', setTime: t => { timeLeft = t; }, get timeLeft() { return timeLeft; }, get exitOpen() { return exitOpen; }, get cluesGot() { return cluesGot; }, get secretDoors() { return secretDoors; }, interact, get promptTarget() { return promptTarget; }, lastShot: null, shotN: 0, castShot, get ammo() { return ammo; }, get fireT() { return fireT; }, startLevel, beginPlay, get state() { return state; }, get player() { return player; }, get G() { return G; }, get zombies() { return zombies; }, get ghosts() { return ghosts; }, get boss() { return boss; }, get urns() { return urns; }, save: () => save, unlockExit, levelComplete, jumpScare, fire, useLantern, input, renderer, scene, camera, setQuality: q => { save.settings.q = q; applyQuality(); }, levelParams, generate, collectAll: () => { for (const c of clueObjs) { c.got = true; c.g.visible = false; } cluesGot = clueObjs.length; unlockExit(); } };

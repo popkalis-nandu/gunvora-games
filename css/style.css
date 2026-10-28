@@ -341,3 +341,5 @@ kbd{background:#fff;border:1px solid var(--line-2);border-bottom-width:3px;borde
 .e404 .big{font-family:var(--display);font-size:clamp(5rem,18vw,10rem);font-weight:800;line-height:1;background:linear-gradient(135deg,var(--primary-600),#7c3aed 55%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:700px){.topbar span:not(:first-child),.topbar a{display:none}.topbar .wrap{min-height:30px}}
+/* phones in landscape: let landscape web games use the full screen height instead of a ~240px strip */
+@media (orientation:landscape) and (max-height:520px){.stage.embed.landscape{max-height:calc(100vh - 12px);max-width:calc((100vh - 12px) * 16 / 9)}}

@@ -94,6 +94,8 @@ export class Zombie {
     if (variant === 3) { root.scale.setScalar(sc * 1.3); this.scale = sc * 1.3; }
     this.phase = rng() * 10; this.state = 'idle'; this.atkT = 0; this.deadT = 0; this.flash = 0; this.aggro = false; this.groanT = 2 + rng() * 6; this.yaw = rng() * 6.28; this.radius = 0.35 * this.scale;
     this.armL.rotation.x = this.armR.rotation.x = -1.2;
+    head.userData.head = jaw.userData.head = true; neck.children.forEach(o => { if (o.isMesh) o.userData.head = true; });
+    this.hitMeshes = []; root.traverse(o => { if (o.isMesh) this.hitMeshes.push(o); });
   }
   get x() { return this.root.position.x; } get z() { return this.root.position.z; }
   hit(dmg, head) {
@@ -229,6 +231,8 @@ export class Boss {
       vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec4 mv=modelViewMatrix*vec4(position,1.); vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz); vP=position; gl_Position=projectionMatrix*mv; }',
       fragmentShader: 'uniform float op,t; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ float f=pow(1.-abs(dot(vN,vV)),3.0); float hex=0.5+0.5*sin(vP.y*14.+t*3.)*sin(atan(vP.z,vP.x)*12.); vec3 c=vec3(1.6,0.18,0.06)*(f*1.4+hex*0.08); gl_FragColor=vec4(c*(op*2.2),1.); }' });
     this.shield = new THREE.Mesh(new THREE.IcosahedronGeometry(1.7, 2), this.shieldMat); this.shield.position.y = 1.9; root.add(this.shield);
+    head.userData.head = true; neck.children.forEach(o => { if (o.isMesh && o.geometry.type !== 'CylinderGeometry') o.userData.head = true; });
+    this.hitMeshes = []; body.traverse(o => { if (o.isMesh) this.hitMeshes.push(o); });
     this.light = new THREE.PointLight(0xff2010, 4, 9, 2); this.light.position.y = 2.5; root.add(this.light);
     root.scale.setScalar(1.15);
     this.hp = this.maxHp = P.bossHp; this.final = P.final; this.speed = 1.1 + P.d * 1.4; this.phase2 = false; this.state = 'intro'; this.t = 0; this.orbT = 3; this.sumT = 10; this.tpT = 14; this.atkT = 0; this.flash = 0; this.yaw = 0; this.deadT = 0; this.P = P;
