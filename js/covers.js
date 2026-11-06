@@ -131,7 +131,7 @@
         '<rect x="' + (x + 40) + '" y="20" width="' + (w - 10).toFixed(1) + '" height="20" rx="3" fill="#ffd23f"/><path d="M' + (x + 20) + ' 30 h-20 m' + (w + 60).toFixed(0) + ' 0 h20" stroke="#fff" stroke-width="3" stroke-dasharray="5 5"/>';
     }
   };
-  var MAP = { "shadow-front": "soldier", "sniper-range": "range", "deep-sea-strike": "sub", "deep-sea-patrol": "sub", "turbo-racing": "racer", "turbo-rush": "racer", "dino-adventure": "dino", "dino-dash": "dino", "memory-jungle": "memory", "neon-snake": "snake", "star-vanguard": "space", "neon-blocks": "blocks", "color-blast-3": "match3", "turbo-lane-rush": "lanes", "bubble-kingdom": "bubbles", "mini-soldier-strike": "defence", "parking-escape": "parking", "sky-tower-stack": "tower" };
+  var MAP = { "prestige-gp": "racer", "shadow-front": "soldier", "sniper-range": "range", "deep-sea-strike": "sub", "deep-sea-patrol": "sub", "turbo-racing": "racer", "turbo-rush": "racer", "dino-adventure": "dino", "dino-dash": "dino", "memory-jungle": "memory", "neon-snake": "snake", "star-vanguard": "space", "neon-blocks": "blocks", "color-blast-3": "match3", "turbo-lane-rush": "lanes", "bubble-kingdom": "bubbles", "mini-soldier-strike": "defence", "parking-escape": "parking", "sky-tower-stack": "tower" };
 
   /** Returns an inline SVG string for a game cover. variant 0/1 gives alternate art. */
   window.GVCover = function (id, variant, label) {
