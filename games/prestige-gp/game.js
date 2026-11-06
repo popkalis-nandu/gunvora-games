@@ -155,7 +155,7 @@ const wxName=r=>r<.12?'DRY':r<.45?'DRIZZLE':r<.85?'RAIN':'STORM';
 const RN=2600,rainPos=new Float32Array(RN*6),rainV=new Float32Array(RN);
 const rainGeo=new THREE.BufferGeometry();rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));
 const rainMat=new THREE.LineBasicMaterial({color:0xaab8d8,transparent:true,opacity:0,depthWrite:false});
-const rain=new THREE.LineSegments(rainGeo,rainMat);rain.frustumCulled=false;scene.add(rain);
+const rainMesh=new THREE.LineSegments(rainGeo,rainMat);rainMesh.frustumCulled=false;scene.add(rainMesh);
 for(let i=0;i<RN;i++){rainV[i]=24+Math.random()*10;const x=(Math.random()-.5)*70,y=Math.random()*30,z=(Math.random()-.5)*70;rainPos.set([x,y,z,x+.1,y+.9,z],i*6);}
 const SPN=500,spPos=new Float32Array(SPN*3),spVel=new Float32Array(SPN*3),spLife=new Float32Array(SPN);let spI=0;
 const spGeo=new THREE.BufferGeometry();spGeo.setAttribute('position',new THREE.BufferAttribute(spPos,3));
@@ -293,7 +293,7 @@ function updateWeather(dt){
  hemi.intensity=hemiI;moon.intensity=sunI;renderer.toneMappingExposure=exp;
  player.userData.head.intensity=headP;rivals.forEach(r=>r.mesh.userData.head.intensity=headR);
  sky.material.emissiveIntensity=skyEm;ground.material.color.copy(gndC);
- rainMat.opacity=Math.min(.55,wx.rain*.7);rain.visible=wx.rain>.02;
+ rainMat.opacity=Math.min(.55,wx.rain*.7);rainMesh.visible=wx.rain>.02;
  const cnt=Math.floor(RN*wx.rain);rainGeo.setDrawRange(0,cnt*2);
  const cx=camera.position.x,cy=camera.position.y,cz=camera.position.z,wind=2+wx.rain*4;
  for(let i=0;i<cnt;i++){const o=i*6;let x=rainPos[o],y=rainPos[o+1]-rainV[i]*dt,z=rainPos[o+2]+wind*dt;
