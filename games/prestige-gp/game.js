@@ -135,17 +135,22 @@ function makeCar(paint,number){
  // headlight beams
  const head=new THREE.SpotLight(0xf2f4ff,0,90,.42,.5,1.2);head.position.set(0,.8,-2.2);head.target.position.set(0,0,-30);car.add(head,head.target);
  car.userData={body,wheels,head,tlM};scene.add(car);return car;}
-const player=makeCar(0x5a0a10,'1');player.userData.head.intensity=260;player.userData.head.castShadow=true;
+const player=makeCar(0x5a0a10,'1');player.userData.head.intensity=0;player.userData.head.castShadow=true;
 
-// rivals: serious professional entries
+// rivals: same top speed and acceleration as the player
 const RIV=[{c:0x101114,n:'7',name:'A. LINDQVIST'},{c:0x1b2230,n:'22',name:'M. ROSSETTI'},{c:0x3a3a40,n:'44',name:'K. TANAKA'}];
-const rivals=RIV.map((r,i)=>{const m=makeCar(r.c,r.n);m.userData.head.intensity=120;return {mesh:m,s:(18+i*16)%LEN,lane:(i%2?-2.5:2.5),v:0,pace:.93+i*.025,name:r.name,num:r.n};});
+const rivals=RIV.map((r,i)=>{const m=makeCar(r.c,r.n);m.userData.head.intensity=0;return {mesh:m,s:(18+i*16)%LEN,lane:(i%2?-2.5:2.5),v:0,name:r.name,num:r.n};});
+const TOP_MS=260/3.6; // matches player sixth-gear cap
+let lampI=180;
 
 // ---------- Weather ----------
 const WX=[{n:'DRY',r:0,t:22},{n:'DRIZZLE',r:.3,t:18},{n:'RAIN',r:.65,t:15},{n:'STORM',r:1,t:12}];
 const wx={idx:0,rain:0,target:0,temp:22,wet:0,auto:70+Math.random()*50,flash:0,nextL:4};
 const setW=i=>{wx.idx=i;wx.target=WX[i].r;flashMsg('FORECAST · '+WX[i].n);};
 const cycleW=()=>{setW((wx.idx+1)%4);wx.auto=70+Math.random()*60;};
+const TOD=['DAY','DUSK','NIGHT'];
+let tod=0; // start in daylight
+const cycleTod=()=>{tod=(tod+1)%3;flashMsg(TOD[tod]);};
 const wxName=r=>r<.12?'DRY':r<.45?'DRIZZLE':r<.85?'RAIN':'STORM';
 const RN=2600,rainPos=new Float32Array(RN*6),rainV=new Float32Array(RN);
 const rainGeo=new THREE.BufferGeometry();rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));
@@ -166,7 +171,7 @@ resetPlayer();
 function nearest(x,z,hint){let best=1e9,bi=hint;for(let j=-40;j<=40;j++){const q=(hint+j+NS)%NS,dx=P[q].x-x,dz=P[q].z-z,d=dx*dx+dz*dz;if(d<best){best=d;bi=q;}}
  const lat=(x-P[bi].x)*NM[bi].x+(z-P[bi].z)*NM[bi].z;return[bi,lat];}
 const K={};let TC={};
-addEventListener('keydown',e=>{K[e.code]=1;if(e.code==='KeyQ')cycleW();if(e.code==='KeyC')camMode=(camMode+1)%3;if(e.code==='Escape'||e.code==='KeyP')togP();if(/Arrow|Space/.test(e.code))e.preventDefault();audioInit();});
+addEventListener('keydown',e=>{K[e.code]=1;if(e.code==='KeyQ')cycleW();if(e.code==='KeyT')cycleTod();if(e.code==='KeyC')camMode=(camMode+1)%3;if(e.code==='Escape'||e.code==='KeyP')togP();if(/Arrow|Space/.test(e.code))e.preventDefault();audioInit();});
 addEventListener('keyup',e=>{K[e.code]=0;});
 function hold(id,k){const el=$(id);const on=e=>{e.preventDefault();TC[k]=1;audioInit();},off=e=>{e.preventDefault();TC[k]=0;};el.addEventListener('touchstart',on);el.addEventListener('touchend',off);el.addEventListener('touchcancel',off);}
 hold('tL','l');hold('tR','r');hold('tB','b');hold('tG','g');
@@ -174,7 +179,7 @@ if('ontouchstart' in window||navigator.maxTouchPoints>0)$('touch').classList.rem
 let camMode=0,running=false,paused=false,countdown=0;
 function togP(){if(!running)return;paused=!paused;$('pause').classList.toggle('hide',!paused);}
 $('go').onclick=()=>{$('title').classList.add('hide');running=true;resetPlayer();countdown=4.5;audioInit();};
-$('res').onclick=togP;$('bp').onclick=togP;$('bw').onclick=cycleW;$('bc').onclick=()=>camMode=(camMode+1)%3;
+$('res').onclick=togP;$('bp').onclick=togP;$('bw').onclick=cycleW;$('bt').onclick=cycleTod;$('bc').onclick=()=>camMode=(camMode+1)%3;
 let msgT=0;function flashMsg(t){$('msg').textContent=t;$('msg').style.opacity=1;msgT=2.2;}
 
 // simple engine audio
@@ -228,10 +233,12 @@ function updatePlayer(dt){
  if(AC){osc.frequency.value=60+S.rpm*190;osc2.frequency.value=30+S.rpm*95;gainN.gain.value=running&&!paused?.035+S.thr*.05:0;}
 }
 function updateRivals(dt){if(countdown>0)return;
+ const wetFactor=1-.45*wx.wet,tempF=wx.temp<10?.95:1,mu=1.25*wetFactor*tempF,look=36;
  for(const r of rivals){const i=Math.floor((r.s/LEN)*NS)%NS;
-  // curvature-based target speed
-  const j=(i+60)%NS,c=1-TG[i].dot(TG[j]);const vmax=(18+70*Math.exp(-c*55))*r.pace*(1-.3*wx.wet);
-  r.v+=Math.max(-10*dt,Math.min(5.5*dt,vmax-r.v));r.s=(r.s+r.v*dt)%LEN;r.lane+=(Math.sin(r.s*.01)*2-r.lane)*dt*.3;
+  // same top speed as the player; slow only to the same grip-limited corner speed
+  const j=(i+look)%NS,dot=Math.max(-1,Math.min(1,TG[i].dot(TG[j]))),ang=Math.acos(dot),dist=LEN*look/NS;
+  const radius=ang>0.015?dist/ang:1e6,vmax=Math.min(TOP_MS,Math.sqrt(mu*9.81*Math.max(10,radius)));
+  r.v+=Math.max(-11.5*dt,Math.min(9.5*dt,vmax-r.v));r.s=(r.s+r.v*dt+LEN)%LEN;r.lane+=(Math.sin(r.s*.01)*2-r.lane)*dt*.3;
   // keep out of player's way roughly: simple separation
   const k=Math.floor((r.s/LEN)*NS)%NS,o={};placeAt(k,r.lane,o);const dx=o.x-S.x,dz=o.z-S.z,d=Math.hypot(dx,dz);
   if(d<4.2){const pk=(o.x-S.x)/d,pz=(o.z-S.z)/d;S.vx-=pk*2;S.vz-=pz*2;r.v*=.97;}
@@ -257,8 +264,35 @@ function updateWeather(dt){
  wx.temp+=(WX[wx.idx].t-wx.temp)*dt/50;
  if(wx.rain>.8){wx.nextL-=dt;if(wx.nextL<0){wx.flash=1;wx.nextL=5+Math.random()*10;}}wx.flash=Math.max(0,wx.flash-dt*3);
  const w=wx.wet;roadMat.roughness=.92-.72*w;roadMat.metalness=.25*w;roadMat.color.setScalar(1-.45*w);kerbMat.roughness=.7-.5*w;runMat.color.setScalar(1-.3*w);
- const fogC=FOG.clone().lerp(new THREE.Color(0x141a24),wx.rain);scene.fog.color.copy(fogC);scene.background.copy(fogC);scene.fog.far=520-300*wx.rain;scene.fog.near=60-40*wx.rain;
- hemi.intensity=.55-.2*wx.rain+wx.flash*3;moon.intensity=.6*(1-.7*wx.rain)+wx.flash*4;
+ // sky, sun and lamps follow time of day; rain still greys the sky
+ const rain=wx.rain,flash=wx.flash;
+ let skyC,sunI,hemiI,exp,headP,headR,skyEm,gndC;
+ if(tod===0){ // DAY
+  skyC=new THREE.Color(0x7eb3d8).lerp(new THREE.Color(0x6a7c8c),rain);
+  scene.fog.near=90-35*rain;scene.fog.far=1200-550*rain;
+  hemi.color.set(0xa8d0f0);hemi.groundColor.set(0x7a6a48);hemiI=1.45-.5*rain+flash*2;
+  moon.color.set(0xfff1c4);sunI=2.45*(1-.82*rain)+flash*3;exp=1.04;
+  headMat.emissiveIntensity=.06;lampI=0;headP=0;headR=0;
+  sky.material.color.set(0x5a6573);skyEm=0;gndC=new THREE.Color(0x3a5532).lerp(new THREE.Color(0x1c2a1c),rain*.4);
+ }else if(tod===1){ // DUSK
+  skyC=new THREE.Color(0xc47a4a).lerp(new THREE.Color(0x4a4558),rain);
+  scene.fog.near=70-30*rain;scene.fog.far=700-280*rain;
+  hemi.color.set(0xe8a878);hemi.groundColor.set(0x4a3020);hemiI=.95-.3*rain+flash*2;
+  moon.color.set(0xffc088);sunI=1.2*(1-.7*rain)+flash*3;exp=1.12;
+  headMat.emissiveIntensity=1.6;lampI=90;headP=140;headR=70;
+  sky.material.color.set(0x2a2832);sky.material.emissive.setHex(0x3a2010);skyEm=.35;gndC=new THREE.Color(0x243022);
+ }else{ // NIGHT
+  skyC=FOG.clone().lerp(new THREE.Color(0x141a24),rain);
+  scene.fog.near=60-40*rain;scene.fog.far=520-300*rain;
+  hemi.color.set(0x5a6c9a);hemi.groundColor.set(0x15110c);hemiI=.55-.2*rain+flash*3;
+  moon.color.set(0xc8d4ff);sunI=.6*(1-.7*rain)+flash*4;exp=1.1;
+  headMat.emissiveIntensity=3;lampI=180*(1+.4*wx.wet);headP=260;headR=120;
+  sky.material.color.set(0x0e1018);sky.material.emissive.setHex(0x1a1508);skyEm=.6;gndC=new THREE.Color(0x0c100d);
+ }
+ scene.fog.color.copy(skyC);scene.background.copy(skyC);
+ hemi.intensity=hemiI;moon.intensity=sunI;renderer.toneMappingExposure=exp;
+ player.userData.head.intensity=headP;rivals.forEach(r=>r.mesh.userData.head.intensity=headR);
+ sky.material.emissiveIntensity=skyEm;ground.material.color.copy(gndC);
  rainMat.opacity=Math.min(.55,wx.rain*.7);rain.visible=wx.rain>.02;
  const cnt=Math.floor(RN*wx.rain);rainGeo.setDrawRange(0,cnt*2);
  const cx=camera.position.x,cy=camera.position.y,cz=camera.position.z,wind=2+wx.rain*4;
@@ -269,18 +303,21 @@ function updateWeather(dt){
  for(let i=0;i<SPN;i++){if(spLife[i]>0){spLife[i]-=dt;spPos[i*3]+=spVel[i*3]*dt;spPos[i*3+1]+=spVel[i*3+1]*dt;spPos[i*3+2]+=spVel[i*3+2]*dt;spVel[i*3+1]-=6*dt;if(spLife[i]<=0)spPos[i*3+1]=-50;}}
  spGeo.attributes.position.needsUpdate=true;}
 function updateLamps(){const c=new THREE.Vector3(S.x,0,S.z);const sorted=lampPos.slice().sort((a,b)=>a.distanceToSquared(c)-b.distanceToSquared(c));
- lampLights.forEach((L,i)=>{L.position.copy(sorted[i]);L.intensity=180*(1+.4*wx.wet);});
- moon.position.set(S.x+40,80,S.z+30);moon.target.position.set(S.x,0,S.z);}
+ lampLights.forEach((L,i)=>{L.position.copy(sorted[i]);L.intensity=lampI;});
+ if(tod===0)moon.position.set(S.x+90,200,S.z+55);
+ else if(tod===1)moon.position.set(S.x+130,42,S.z+25);
+ else moon.position.set(S.x+40,80,S.z+30);
+ moon.target.position.set(S.x,0,S.z);}
 const ft=t=>{if(t==null)return'–:––.–––';const m=Math.floor(t/60),s=t-m*60;return m+':'+(s<10?'0':'')+s.toFixed(3);};
 function hud(){
  $('tl').innerHTML=`<div><span class="k">LAP</span>${Math.max(1,S.lap)}</div><div><span class="k">TIME</span>${ft(S.lapT)}</div><div><span class="k">LAST</span>${ft(S.last)}</div><div><span class="k">BEST</span>${ft(S.best)}</div>`+
- `<div style="margin-top:6px"><span class="k">WEATHER</span>${wxName(wx.rain)}${Math.abs(wx.target-wx.rain)>.05?' → '+WX[wx.idx].n:''}</div><div><span class="k">WET</span>${Math.round(wx.wet*100)}% · ${wx.temp.toFixed(0)}°C</div><div><span class="k">GRIP</span>${Math.round((S.grip||1)*100)}%${S.off?' · OFF TRACK':''}</div>`;
+ `<div style="margin-top:6px"><span class="k">LIGHT</span>${TOD[tod]}</div><div><span class="k">WEATHER</span>${wxName(wx.rain)}${Math.abs(wx.target-wx.rain)>.05?' → '+WX[wx.idx].n:''}</div><div><span class="k">WET</span>${Math.round(wx.wet*100)}% · ${wx.temp.toFixed(0)}°C</div><div><span class="k">GRIP</span>${Math.round((S.grip||1)*100)}%${S.off?' · OFF TRACK':''}</div>`;
  $('kmh').textContent=Math.round(S.kmh||0);$('gear').textContent=(S.vf||0)<-0.5?'R':S.gear;$('rpm').firstChild.style.width=(S.rpm*100)+'%';}
 let last=performance.now(),acc=0;
 function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
+ if(!paused)updateWeather(dt);
  if(running&&!paused){
   if(countdown>0){const prev=Math.ceil(countdown-.5);countdown-=dt;const n=Math.min(5,Math.floor((4.5-countdown)/0.7));lightsRow.forEach((b,i)=>b.material.emissiveIntensity=(countdown>0&&i<n)?4:0);if(countdown<=0)flashMsg('GO');}
-  updateWeather(dt);
   // fixed-step physics for stability
   acc+=dt;while(acc>=1/120){updatePlayer(1/120);acc-=1/120;}
   updateRivals(dt);
@@ -294,4 +331,4 @@ function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
 rivals.forEach(r=>{const k=Math.floor((r.s/LEN)*NS)%NS,o={};placeAt(k,r.lane,o);r.mesh.position.set(o.x,0,o.z);r.mesh.rotation.y=o.h;});
 requestAnimationFrame(loop);
 // URL options (testing / sharing): ?start=1 skips the title; &wx=0..3 sets weather and soaks the track instantly
-{const q=new URLSearchParams(location.search);if(q.get('start')){$('go').click();countdown=0;}if(q.get('wx')){const i=+q.get('wx');setW(i);wx.rain=wx.wet=WX[i].r;}}
+{const q=new URLSearchParams(location.search);if(q.get('start')){$('go').click();countdown=0;}if(q.get('wx')){const i=+q.get('wx');setW(i);wx.rain=wx.wet=WX[i].r;}if(q.get('tod')!=null)tod=Math.max(0,Math.min(2,+q.get('tod')));}
