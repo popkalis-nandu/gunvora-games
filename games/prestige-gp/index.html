@@ -15,16 +15,33 @@ canvas{display:block}
 #spd .gr{display:inline-block;margin-right:14px;font-size:clamp(20px,5vmin,44px);color:#c9a45c;font-weight:600;vertical-align:top}
 #rpm{width:clamp(140px,26vmin,260px);height:5px;background:rgba(255,255,255,.12);margin:6px 0 0 auto}#rpm i{display:block;height:100%;background:linear-gradient(90deg,#c9a45c,#b3121b)}
 #msg{top:38%;width:100%;text-align:center;font-size:clamp(18px,4vmin,40px);letter-spacing:.35em;font-weight:300;opacity:0;transition:opacity .4s}
-.btn{position:fixed;padding:7px 12px;background:rgba(8,8,12,.7);border:1px solid #c9a45c;color:#c9a45c;font:600 11px system-ui;letter-spacing:.15em;border-radius:2px;z-index:3}
+.btn{position:fixed;padding:7px 12px;background:rgba(8,8,12,.7);border:1px solid #c9a45c;color:#c9a45c;font:600 11px system-ui;letter-spacing:.15em;border-radius:2px;z-index:3;cursor:pointer}
+.btn.need{background:#b3121b;border-color:#f5ecd8;color:#f5ecd8;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(179,18,27,.6)}50%{box-shadow:0 0 0 8px rgba(179,18,27,0)}}
 .ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 60%,rgba(40,10,12,.75),rgba(0,0,0,.94));text-align:center;z-index:5}
 .ov .s{color:#c9a45c;letter-spacing:.6em;font-size:clamp(10px,1.8vmin,14px)}
 .ov h1{font-weight:200;letter-spacing:.22em;font-size:clamp(26px,7vmin,70px);margin:.2em 0;color:#f5ecd8}
 .ov hr{width:180px;border:0;border-top:1px solid #c9a45c;margin:10px 0 16px}
 .ov p{opacity:.75;max-width:560px;font-size:13px;line-height:1.7;padding:0 16px}
-.ov button{margin-top:16px;padding:13px 40px;background:transparent;color:#f5ecd8;border:1px solid #c9a45c;font:600 13px system-ui;letter-spacing:.4em;cursor:pointer}
+.ov button,.ov .row button{margin:8px 8px 0;padding:13px 32px;background:transparent;color:#f5ecd8;border:1px solid #c9a45c;font:600 13px system-ui;letter-spacing:.35em;cursor:pointer}
 .ov button:hover{background:#c9a45c;color:#000}
 .hide{display:none!important}
 .tc{position:fixed;bottom:16px;width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(201,164,92,.55);color:#c9a45c;font:700 20px system-ui;display:flex;align-items:center;justify-content:center;z-index:3}
+#garage{position:fixed;inset:0;z-index:6;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
+#garage .panel{pointer-events:auto;width:min(420px,92vw);height:100%;background:linear-gradient(180deg,rgba(18,14,12,.96),rgba(8,8,12,.97));border-left:1px solid #c9a45c;padding:22px 22px 28px;box-sizing:border-box;overflow:auto;box-shadow:-20px 0 60px rgba(0,0,0,.55)}
+#garage .panel h2{font-weight:200;letter-spacing:.35em;font-size:22px;margin:0 0 4px;color:#f5ecd8}
+#garage .panel .sub{color:#c9a45c;letter-spacing:.4em;font-size:11px;margin-bottom:18px}
+#garage .cred{font-size:14px;letter-spacing:.2em;margin-bottom:16px;color:#eee6d4}
+#garage .cred b{color:#c9a45c}
+.grow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid rgba(201,164,92,.25)}
+.grow .gl{text-align:left;flex:1}
+.grow .gl b{letter-spacing:.2em;font-size:13px;color:#f5ecd8}
+.grow .gs{opacity:.7;font-size:11px;line-height:1.5;margin-top:4px}
+.grow button{flex-shrink:0;padding:10px 14px;background:transparent;border:1px solid #c9a45c;color:#c9a45c;font:600 11px system-ui;letter-spacing:.12em;cursor:pointer}
+.grow button:hover:not(:disabled){background:#c9a45c;color:#000}
+.grow button:disabled{opacity:.4;cursor:default}
+#gClose{margin-top:18px;width:100%;padding:12px;background:transparent;border:1px solid #c9a45c;color:#f5ecd8;font:600 12px system-ui;letter-spacing:.3em;cursor:pointer}
+#gClose:hover{background:#c9a45c;color:#000}
 </style></head><body>
 <div class="hud" id="tl"></div>
 <div class="hud" id="spd"><span class="gr" id="gear">N</span><span class="v" id="kmh">0</span><div class="u">KM/H</div><div id="rpm"><i></i></div></div>
@@ -33,10 +50,18 @@ canvas{display:block}
 <button class="btn" id="bt" style="top:12px;right:110px">TIME</button>
 <button class="btn" id="bc" style="top:12px;right:188px">CAMERA</button>
 <button class="btn" id="bp" style="top:12px;right:276px">PAUSE</button>
+<button class="btn" id="br" style="top:12px;right:354px">RECOVER</button>
+<button class="btn" id="bg" style="top:12px;right:450px">GARAGE</button>
 <div id="touch" class="hide"><div class="tc" id="tL" style="left:14px">◀</div><div class="tc" id="tR" style="left:94px">▶</div><div class="tc" id="tB" style="right:200px;bottom:16px">BRK</div><div class="tc" id="tG" style="right:200px;bottom:94px">GAS</div></div>
 <div class="ov" id="title"><div class="s">PRESTIGE GP</div><h1>ABSOLUTE CHAOS</h1><hr><div class="s">STREET CIRCUIT · GT SIMULATION</div>
-<p>Street circuit in day, dusk or night. Weather builds slowly — the tarmac takes over a minute to soak, and wet asphalt costs up to 45% of your grip. Brake early, be smooth on the throttle.<br><br>W/↑ throttle · S/↓ brake · A D/← → steer · Q weather · T day/dusk/night · C camera · Esc/P pause</p>
-<button id="go">START SESSION</button></div>
-<div class="ov hide" id="pause"><div class="s">SESSION</div><h1>PAUSED</h1><hr><button id="res">RESUME</button></div>
+<p>Street circuit in day, dusk or night with a living city skyline. Upgrade your GT in the garage, recover to track centre with one click after a hit, and drive from a royal full-dashboard cockpit.<br><br>W/↑ throttle · S/↓ brake · A D/← → steer · R recover · Q weather · T day/dusk/night · C camera · G garage · Esc/P pause</p>
+<div class="row"><button id="go">START SESSION</button><button id="gTitle">GARAGE</button></div></div>
+<div class="ov hide" id="pause"><div class="s">SESSION</div><h1>PAUSED</h1><hr><button id="res">RESUME</button><button id="bgPause" onclick="document.getElementById('bg').click()">GARAGE</button></div>
+<div id="garage" class="hide"><div class="panel">
+<div class="sub">PRESTIGE WORKS</div><h2>GARAGE</h2>
+<div class="cred">BANKROLL · <b id="gCredits">0 CR</b></div>
+<div id="gList"></div>
+<button id="gClose">CLOSE</button>
+</div></div>
 <script type="module" src="./game.js"></script>
 </body></html>

@@ -74,14 +74,14 @@ window.GV_GAMES = [
     instructions: ["Create a captain (name and password) to save your own progress on this device.", "Pick an ocean and a level, read the briefing, then dive in.", "Earn coins and stars to upgrade hulls, torpedoes and abilities.", "Rotate your phone to landscape for the best view."]
   },
   {
-    id: "prestige-gp", title: "Prestige GP: Absolute Chaos", tagline: "3D GT racing simulation by day, dusk or night. Weather changes the grip.",
+    id: "prestige-gp", title: "Prestige GP: Absolute Chaos", tagline: "Console-style 3D street circuit with a living city, garage upgrades and a royal cockpit.",
     status: "playable", premium: false, kids: false, featured: true, isNew: true, trending: 0, added: "2026-11-06",
     embed: "games/prestige-gp/", orientation: "landscape",
     categories: ["racing"], difficulty: "Medium", age: "3+",
     platforms: ["Web (desktop & mobile)"],
-    storyline: "A console-style 3D GT racing simulation on a street circuit with kerbs, Armco barriers, grandstands and a start/finish gantry. Switch between day, dusk and night. You drive a front-engined GT car against professional rivals with the same top speed. Rain builds slowly from drizzle to storm, the tarmac takes over a minute to soak, and wet asphalt costs up to 45% of your tyre grip.",
-    controls: ["W / Up arrow: throttle", "S / Down arrow: brake / reverse", "A D / Left Right arrows: steer", "Q or WEATHER button: cycle weather", "T or TIME button: cycle day, dusk and night", "C or CAMERA button: chase / cockpit / trackside camera", "Esc or P: pause", "Touch: on-screen steer, gas and brake buttons"],
-    instructions: ["Wait for the five start lights, then lap the circuit and set your best time.", "Steering lock reduces at speed; enter corners too fast and the car slides wide.", "Use T or the TIME button for daylight, dusk or night.", "Weather changes on its own, or cycle it with Q. Wetness ramps over about 70 seconds and dries more slowly; watch the WET and GRIP readouts.", "Grass and gravel cut grip and speed; the barriers stop the car."]
+    storyline: "A console-style 3D GT racing simulation on a prestige street circuit lined with facades, grandstands, trees, flags and a harbour skyline. Switch day, dusk and night. Upgrade Engine, Tyres, Brakes, Aero and Body in the garage with race credits. After a hit, one click or R recovers you to track centre, straight. Drive from a royal full-dashboard cockpit. Professional rivals match stock top speed; rain still soaks the tarmac and costs grip.",
+    controls: ["W / Up arrow: throttle", "S / Down arrow: brake / reverse", "A D / Left Right arrows: steer", "R or RECOVER button: snap to track centre after a hit", "Q or WEATHER button: cycle weather", "T or TIME button: cycle day, dusk and night", "C or CAMERA button: chase / royal cockpit / trackside", "G or GARAGE button: upgrade the car", "Esc or P: pause", "Touch: on-screen steer, gas and brake buttons"],
+    instructions: ["Open the Garage from the title screen to spend credits on Engine, Tyres, Brakes, Aero and Body before you race.", "Wait for the five start lights, then lap the circuit. Completed laps earn credits for further upgrades.", "If you hit a barrier or spin off, press R, tap RECOVER, or click the view once to return to track centre facing straight.", "Use C until you see the full royal dashboard and steering wheel in the cockpit camera.", "Weather and time of day still change grip and lighting; watch WET and GRIP."]
   },
   {
     id: "velocity-15k", title: "Velocity 15K", tagline: "3D motorbike racing through world cities.",
