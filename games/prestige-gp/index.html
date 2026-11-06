@@ -2,29 +2,40 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Prestige GP: Absolute Chaos</title>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <style>
-html,body{margin:0;height:100%;background:#05060a;overflow:hidden;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#e9e4d8;touch-action:none;user-select:none}
-canvas{display:block;width:100%;height:100%}
-#hud{position:fixed;top:10px;left:12px;font-size:clamp(11px,1.8vmin,16px);letter-spacing:.12em;text-transform:uppercase;line-height:1.6;text-shadow:0 1px 4px #000}
-#hud b{color:#d4af6a;font-size:1.6em}
-#wbtn,#pbtn{position:fixed;top:10px;padding:8px 12px;background:rgba(10,12,20,.75);border:1px solid #d4af6a;color:#d4af6a;font:600 12px system-ui;letter-spacing:.15em;border-radius:4px}
-#wbtn{right:12px}#pbtn{right:120px}
-.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(#141826,#05060a);text-align:center;z-index:5}
-.ov h1{font-weight:300;letter-spacing:.3em;font-size:clamp(20px,5vmin,48px);margin:0;color:#f3ead6}
-.ov h2{color:#d4af6a;letter-spacing:.5em;font-weight:400;font-size:clamp(11px,2vmin,16px)}
-.ov p{opacity:.75;max-width:520px;font-size:13px;line-height:1.6;padding:0 16px}
-.ov button{margin-top:14px;padding:12px 34px;background:#d4af6a;color:#111;border:0;font:700 14px system-ui;letter-spacing:.3em;border-radius:3px}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Segoe UI",system-ui,Roboto,sans-serif;color:#eee6d4;touch-action:none;user-select:none;-webkit-user-select:none}
+canvas{display:block}
+.hud{position:fixed;pointer-events:none;text-shadow:0 1px 3px #000}
+#tl{top:12px;left:12px;background:linear-gradient(90deg,rgba(8,8,12,.85),rgba(8,8,12,.4));border-left:3px solid #c9a45c;padding:8px 14px;font-size:clamp(11px,1.6vmin,15px);letter-spacing:.1em;text-transform:uppercase;line-height:1.7}
+#tl .k{color:#c9a45c;display:inline-block;width:5.5em}
+#spd{bottom:18px;right:22px;text-align:right}
+#spd .v{font-size:clamp(34px,9vmin,84px);font-weight:200;line-height:.9}
+#spd .u{color:#c9a45c;letter-spacing:.3em;font-size:12px}
+#spd .gr{display:inline-block;margin-right:14px;font-size:clamp(20px,5vmin,44px);color:#c9a45c;font-weight:600;vertical-align:top}
+#rpm{width:clamp(140px,26vmin,260px);height:5px;background:rgba(255,255,255,.12);margin:6px 0 0 auto}#rpm i{display:block;height:100%;background:linear-gradient(90deg,#c9a45c,#b3121b)}
+#msg{top:38%;width:100%;text-align:center;font-size:clamp(18px,4vmin,40px);letter-spacing:.35em;font-weight:300;opacity:0;transition:opacity .4s}
+.btn{position:fixed;padding:7px 12px;background:rgba(8,8,12,.7);border:1px solid #c9a45c;color:#c9a45c;font:600 11px system-ui;letter-spacing:.15em;border-radius:2px;z-index:3}
+.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 60%,rgba(40,10,12,.75),rgba(0,0,0,.94));text-align:center;z-index:5}
+.ov .s{color:#c9a45c;letter-spacing:.6em;font-size:clamp(10px,1.8vmin,14px)}
+.ov h1{font-weight:200;letter-spacing:.22em;font-size:clamp(26px,7vmin,70px);margin:.2em 0;color:#f5ecd8}
+.ov hr{width:180px;border:0;border-top:1px solid #c9a45c;margin:10px 0 16px}
+.ov p{opacity:.75;max-width:560px;font-size:13px;line-height:1.7;padding:0 16px}
+.ov button{margin-top:16px;padding:13px 40px;background:transparent;color:#f5ecd8;border:1px solid #c9a45c;font:600 13px system-ui;letter-spacing:.4em;cursor:pointer}
+.ov button:hover{background:#c9a45c;color:#000}
 .hide{display:none!important}
-.tc{position:fixed;bottom:14px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.08);border:1px solid rgba(212,175,106,.5);color:#d4af6a;font:700 22px system-ui;display:flex;align-items:center;justify-content:center}
+.tc{position:fixed;bottom:16px;width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(201,164,92,.55);color:#c9a45c;font:700 20px system-ui;display:flex;align-items:center;justify-content:center;z-index:3}
 </style></head><body>
-<canvas id="c"></canvas>
-<div id="hud"></div>
-<button id="pbtn">PAUSE</button><button id="wbtn">WEATHER</button>
-<div id="tch" class="hide">
-<div class="tc" id="tl" style="left:14px">◀</div><div class="tc" id="tr" style="left:96px">▶</div>
-<div class="tc" id="tb" style="right:96px">■</div><div class="tc" id="tg" style="right:14px">▲</div></div>
-<div class="ov" id="title"><h2>PRESTIGE GP</h2><h1>ABSOLUTE CHAOS</h1><h2>NIGHT STREET CIRCUIT</h2>
-<p>WASD / Arrows to drive · Q or the WEATHER button cycles weather · Esc / P pauses.<br>Rain builds slowly — the track takes over a minute to soak. Wet tarmac loses up to 45% grip.</p>
-<button id="go">START RACE</button></div>
-<div class="ov hide" id="pause"><h1>PAUSED</h1><button id="res">RESUME</button></div>
-<script src="game.js"></script></body></html>
+<div class="hud" id="tl"></div>
+<div class="hud" id="spd"><span class="gr" id="gear">N</span><span class="v" id="kmh">0</span><div class="u">KM/H</div><div id="rpm"><i></i></div></div>
+<div class="hud" id="msg"></div>
+<button class="btn" id="bw" style="top:12px;right:12px">WEATHER</button>
+<button class="btn" id="bc" style="top:12px;right:110px">CAMERA</button>
+<button class="btn" id="bp" style="top:12px;right:198px">PAUSE</button>
+<div id="touch" class="hide"><div class="tc" id="tL" style="left:14px">◀</div><div class="tc" id="tR" style="left:94px">▶</div><div class="tc" id="tB" style="right:200px;bottom:16px">BRK</div><div class="tc" id="tG" style="right:200px;bottom:94px">GAS</div></div>
+<div class="ov" id="title"><div class="s">PRESTIGE GP</div><h1>ABSOLUTE CHAOS</h1><hr><div class="s">NIGHT CIRCUIT · GT SIMULATION</div>
+<p>Floodlit street circuit at night. Weather builds slowly — the tarmac takes over a minute to soak, and wet asphalt costs up to 45% of your grip. Brake early, be smooth on the throttle.<br><br>W/↑ throttle · S/↓ brake · A D/← → steer · Q weather · C camera · Esc/P pause</p>
+<button id="go">START SESSION</button></div>
+<div class="ov hide" id="pause"><div class="s">SESSION</div><h1>PAUSED</h1><hr><button id="res">RESUME</button></div>
+<script type="module" src="./game.js"></script>
+</body></html>

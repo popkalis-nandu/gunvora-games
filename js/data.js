@@ -74,14 +74,14 @@ window.GV_GAMES = [
     instructions: ["Create a captain (name and password) to save your own progress on this device.", "Pick an ocean and a level, read the briefing, then dive in.", "Earn coins and stars to upgrade hulls, torpedoes and abilities.", "Rotate your phone to landscape for the best view."]
   },
   {
-    id: "prestige-gp", title: "Prestige GP: Absolute Chaos", tagline: "Serious night-street racing. Weather changes the grip.",
+    id: "prestige-gp", title: "Prestige GP: Absolute Chaos", tagline: "3D GT racing simulation on a floodlit night circuit. Weather changes the grip.",
     status: "playable", premium: false, kids: false, featured: true, isNew: true, trending: 0, added: "2026-11-06",
     embed: "games/prestige-gp/", orientation: "landscape",
     categories: ["racing"], difficulty: "Medium", age: "3+",
     platforms: ["Web (desktop & mobile)"],
-    storyline: "Race a prestige night street circuit lined with lamps and city blocks. Rain builds slowly from drizzle to storm, soaking the tarmac over a minute or more, and as the track gets wetter your tyres lose up to 45% of their grip.",
-    controls: ["W / Up arrow: throttle", "S / Down arrow: brake / reverse", "A D / Left Right arrows: steer", "Q or WEATHER button: cycle weather", "Esc or P: pause", "Touch: on-screen steer, brake and throttle buttons"],
-    instructions: ["Complete laps of the night street circuit and beat your best lap time.", "Weather changes on its own during a race, or cycle it yourself.", "Wetness ramps slowly; watch the Wet and Grip readouts and brake earlier as the road soaks.", "Leaving the track slows the car sharply."]
+    storyline: "A console-style 3D GT racing simulation on a floodlit night street circuit, with kerbs, Armco barriers, grandstands and a start/finish gantry. You drive a front-engined GT car against professional rivals. Rain builds slowly from drizzle to storm, the tarmac takes over a minute to soak, and wet asphalt costs up to 45% of your tyre grip.",
+    controls: ["W / Up arrow: throttle", "S / Down arrow: brake / reverse", "A D / Left Right arrows: steer", "Q or WEATHER button: cycle weather", "C or CAMERA button: chase / cockpit / trackside camera", "Esc or P: pause", "Touch: on-screen steer, gas and brake buttons"],
+    instructions: ["Wait for the five start lights, then lap the circuit and set your best time.", "Steering lock reduces at speed; enter corners too fast and the car slides wide.", "Weather changes on its own, or cycle it with Q. Wetness ramps over about 70 seconds and dries more slowly; watch the WET and GRIP readouts.", "Grass and gravel cut grip and speed; the barriers stop the car."]
   },
   {
     id: "velocity-15k", title: "Velocity 15K", tagline: "3D motorbike racing through world cities.",
